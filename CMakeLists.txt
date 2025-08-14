@@ -22,7 +22,10 @@
     list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
  
   IF(APPLE)
-   SET(CMAKE_OSX_ARCHITECTURES "x86_64;arm64" CACHE STRING "Build architectures for Mac OS X" FORCE)
+   # Allow command line override of architectures, default to universal if not specified
+   if(NOT DEFINED CMAKE_OSX_ARCHITECTURES)
+     SET(CMAKE_OSX_ARCHITECTURES "x86_64;arm64" CACHE STRING "Build architectures for Mac OS X")
+   endif()
    SET(CMAKE_OSX_DEPLOYMENT_TARGET "10.14" CACHE STRING "Minimum OS X deployment version")
   ENDIF(APPLE)
 
@@ -87,8 +90,37 @@ endif()
 
 if(APPLE)
     include(GNUInstallDirs)
-    set (MADRONALIB_INCLUDE_DIR "${CMAKE_INSTALL_FULL_INCLUDEDIR}/madronalib")
-    set (MADRONALIB_LIBRARY_DIR ${CMAKE_INSTALL_FULL_LIBDIR})
+    # Resolve madronalib include and library on macOS; prefer Homebrew paths
+    if(NOT DEFINED MADRONALIB_INCLUDE_DIR)
+      find_path(MADRONALIB_INCLUDE_DIR
+        NAMES madronalib.h
+        PATHS 
+          /opt/homebrew/include
+          /usr/local/include
+      )
+      if(NOT MADRONALIB_INCLUDE_DIR)
+        # Fallback to default install include
+        set(MADRONALIB_INCLUDE_DIR "${CMAKE_INSTALL_FULL_INCLUDEDIR}")
+      endif()
+    endif()
+
+    if(NOT DEFINED MADRONALIB_LIBRARY)
+      # Try config-specific first, then generic
+      set(_ML_LIBNAMES "madrona")
+      list(APPEND _ML_LIBNAMES "madrona-debug")
+      find_library(MADRONALIB_LIBRARY
+        NAMES ${_ML_LIBNAMES}
+        PATHS 
+          /opt/homebrew/lib
+          /usr/local/lib
+      )
+    endif()
+
+    if(MADRONALIB_LIBRARY)
+      get_filename_component(MADRONALIB_LIBRARY_DIR "${MADRONALIB_LIBRARY}" DIRECTORY)
+    elseif(NOT DEFINED MADRONALIB_LIBRARY_DIR)
+      set(MADRONALIB_LIBRARY_DIR "${CMAKE_INSTALL_FULL_LIBDIR}")
+    endif()
 elseif(WIN32)
     if(EXISTS "C:/Program Files/madronalib/lib/madrona.lib")
         set (MADRONALIB_INCLUDE_DIR "C:/Program Files/madronalib/include")
@@ -104,7 +136,11 @@ endif()
 set(madronalib_NAME madrona$<$<CONFIG:Debug>:-debug>)
 
 message("madronalib headers should be in: " ${MADRONALIB_INCLUDE_DIR} )
-message("madronalib library should be in: " ${MADRONALIB_LIBRARY_DIR}/${madronalib_NAME} )
+if(MADRONALIB_LIBRARY)
+  message("madronalib library found: " ${MADRONALIB_LIBRARY} )
+else()
+  message("madronalib library should be in: " ${MADRONALIB_LIBRARY_DIR}/lib${madronalib_NAME}.a )
+endif()
 
 
  #--------------------------------------------------------------------
@@ -388,7 +424,11 @@ if(BUILD_TESTS)
     target_include_directories(${target} PRIVATE ${MADRONALIB_INCLUDE_DIR})
     target_include_directories(${target} PRIVATE ${MADRONALIB_INCLUDE_DIR}/madronalib)
     if(APPLE)
-        target_link_libraries(${target} PRIVATE "${MADRONALIB_LIBRARY_DIR}/lib${madronalib_NAME}.a")
+        if(MADRONALIB_LIBRARY)
+            target_link_libraries(${target} PRIVATE ${MADRONALIB_LIBRARY})
+        else()
+            target_link_libraries(${target} PRIVATE "${MADRONALIB_LIBRARY_DIR}/lib${madronalib_NAME}.a")
+        endif()
     elseif(WIN32)
         target_link_libraries(${target} PRIVATE "${MADRONALIB_LIBRARY_DIR}/${madronalib_NAME}.lib")
     endif()
@@ -449,10 +489,41 @@ if(BUILD_SDL2_APP)
     # find SDL headers and libraries
     target_compile_definitions(${target} PRIVATE ML_INCLUDE_SDL=1)
     if(APPLE)
-        # to use the SDL2 framework in /Library/Frameworks, do this:
-        set_target_properties(${target} PROPERTIES XCODE_ATTRIBUTE_LD_RUNPATH_SEARCH_PATHS "/Library/Frameworks")
-        find_package(SDL2 REQUIRED COMPONENTS SDL2)
-                
+      # On macOS, prefer Homebrew SDL2 if installed; otherwise use the SDL2 framework in /Library/Frameworks
+      set_target_properties(${target} PROPERTIES XCODE_ATTRIBUTE_LD_RUNPATH_SEARCH_PATHS "/Library/Frameworks")
+      # Homebrew check
+      set(_BREW_SDL2_CMAKE_DIR "/opt/homebrew/opt/sdl2/lib/cmake/SDL2")
+      if(NOT EXISTS "${_BREW_SDL2_CMAKE_DIR}")
+        file(GLOB _BREW_SDL2_CMAKE_DIRS "/opt/homebrew/Cellar/sdl2/*/lib/cmake/SDL2")
+        list(LENGTH _BREW_SDL2_CMAKE_DIRS _BREW_SDL2_CMAKE_DIRS_LEN)
+        if(_BREW_SDL2_CMAKE_DIRS_LEN GREATER 0)
+          list(GET _BREW_SDL2_CMAKE_DIRS 0 _BREW_SDL2_CMAKE_DIR)
+        endif()
+      endif()
+      if(EXISTS "${_BREW_SDL2_CMAKE_DIR}")
+        list(APPEND CMAKE_PREFIX_PATH "/opt/homebrew" "/opt/homebrew/opt/sdl2")
+        get_filename_component(_BREW_SDL2_PREFIX "${_BREW_SDL2_CMAKE_DIR}/../../.." ABSOLUTE)
+        list(APPEND CMAKE_PREFIX_PATH "${_BREW_SDL2_PREFIX}")
+        if(NOT DEFINED SDL2_DIR)
+          set(SDL2_DIR "${_BREW_SDL2_CMAKE_DIR}")
+        endif()
+        find_package(SDL2 CONFIG REQUIRED)
+        set(USE_SDL2_FRAMEWORK FALSE)
+        # If using Homebrew SDL2 on Apple Silicon, prefer building the app as arm64 to match the library
+        if(CMAKE_HOST_SYSTEM_PROCESSOR MATCHES "(arm64|aarch64)")
+          set_target_properties(${target} PROPERTIES OSX_ARCHITECTURES "arm64")
+        endif()
+      elseif(EXISTS "/Library/Frameworks/SDL2.framework")
+        set(SDL2_INCLUDE_DIRS 
+          "/Library/Frameworks/SDL2.framework/Headers"
+          "/Library/Frameworks/SDL2.framework/Headers/SDL2"
+        )
+        set(USE_SDL2_FRAMEWORK TRUE)
+      else()
+        # Last resort: try generic search which may find a user-provided SDL2
+        find_package(SDL2 REQUIRED)
+        set(USE_SDL2_FRAMEWORK FALSE)
+      endif()
         
     elseif(WIN32)
         # it seems like there's no standard place to put the SDL dev tools on Windows.
@@ -469,13 +540,19 @@ if(BUILD_SDL2_APP)
     endif()
 
 
-    target_include_directories(${target} PRIVATE ${SDL2_INCLUDE_DIRS})
+    if(APPLE AND USE_SDL2_FRAMEWORK)
+        target_include_directories(${target} PRIVATE ${SDL2_INCLUDE_DIRS})
+    endif()
 
     # add madronalib
     target_include_directories(${target} PRIVATE ${MADRONALIB_INCLUDE_DIR})
     target_include_directories(${target} PRIVATE ${MADRONALIB_INCLUDE_DIR}/madronalib)
     if(APPLE)
-        target_link_libraries(${target} PRIVATE "${MADRONALIB_LIBRARY_DIR}/lib${madronalib_NAME}.a")
+        if(MADRONALIB_LIBRARY)
+            target_link_libraries(${target} PRIVATE ${MADRONALIB_LIBRARY})
+        else()
+            target_link_libraries(${target} PRIVATE "${MADRONALIB_LIBRARY_DIR}/lib${madronalib_NAME}.a")
+        endif()
     elseif(WIN32)
         target_link_libraries(${target} PRIVATE "${MADRONALIB_LIBRARY_DIR}/${madronalib_NAME}.lib")
     endif()
@@ -511,8 +588,12 @@ if(BUILD_SDL2_APP)
     # "other linker flags" in XCode and not in its file browser
     if(APPLE)
         target_link_libraries(${target} PRIVATE "-framework Cocoa" "-framework Metal" "-framework MetalKit"
-            "-framework CoreAudio" "-framework CoreServices"
-            "-framework AppKit" "-framework SDL2" )
+            "-framework CoreAudio" "-framework CoreServices" "-framework AppKit")
+        if(USE_SDL2_FRAMEWORK)
+            target_link_libraries(${target} PRIVATE "-framework SDL2")
+        else()
+            target_link_libraries(${target} PRIVATE SDL2::SDL2)
+        endif()
     elseif(WIN32)
         find_package(OpenGL REQUIRED)
         target_link_libraries(${target} PRIVATE ${OPENGL_gl_LIBRARY})
