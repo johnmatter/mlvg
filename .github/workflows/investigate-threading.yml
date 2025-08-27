@@ -21,11 +21,6 @@ on:
         - Release
         - RelWithDebInfo
         - MinSizeRel
-  push:
-    branches:
-      - windows-threading
-    paths:
-      - '.github/workflows/investigate-threading.yml'
 
 jobs:
   investigate:
