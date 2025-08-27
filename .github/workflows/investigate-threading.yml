@@ -1,0 +1,268 @@
+name: Investigate Threading Issue
+
+on:
+  workflow_dispatch:
+    inputs:
+      approach:
+        description: 'Investigation approach'
+        required: true
+        default: 'minimal-cmake'
+        type: choice
+        options:
+        - minimal-cmake
+        - command-line-flags
+      build_type:
+        description: 'Build type'
+        required: true
+        default: 'Release'
+        type: choice
+        options:
+        - Debug
+        - Release
+        - RelWithDebInfo
+        - MinSizeRel
+
+jobs:
+  investigate:
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout madronalib
+      uses: actions/checkout@v4
+      with:
+        repository: johnmatter/madronalib
+        ref: main
+        path: madronalib
+    
+    - name: Setup MSVC
+      uses: ilammy/msvc-dev-cmd@v1
+    
+    - name: Setup Ninja
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install Ninja
+      run: |
+        python -m pip install ninja
+        ninja --version
+    
+    - name: Configure Git
+      run: |
+        git config --system core.longpaths true
+    
+    - name: Approach 1 - Minimal CMakeLists.txt
+      if: inputs.approach == 'minimal-cmake'
+      run: |
+        echo "=== APPROACH 1: Minimal CMakeLists.txt ==="
+        
+        # Create minimal CMakeLists.txt
+        cat > minimal_test/CMakeLists.txt << 'EOF'
+        cmake_minimum_required(VERSION 3.20)
+        project(ThreadingTest)
+        
+        # Force MSVC runtime library
+        set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+        
+        # Simple test executable
+        add_executable(threading_test
+            main.cpp
+        )
+        
+        # Add threading test
+        add_executable(threading_test_simple
+            simple_test.cpp
+        )
+        
+        # Set properties explicitly
+        set_target_properties(threading_test PROPERTIES
+            MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>"
+        )
+        set_target_properties(threading_test_simple PROPERTIES
+            MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>"
+        )
+        
+        # Force static runtime
+        if(MSVC)
+            target_compile_options(threading_test PRIVATE /MT$<$<CONFIG:Debug>:d>)
+            target_compile_options(threading_test_simple PRIVATE /MT$<$<CONFIG:Debug>:d>)
+        endif()
+        EOF
+        
+        # Create simple test files
+        mkdir -p minimal_test
+        
+        cat > minimal_test/main.cpp << 'EOF'
+        #include <iostream>
+        #include <thread>
+        #include <vector>
+        
+        void thread_func(int id) {
+            std::cout << "Thread " << id << " started" << std::endl;
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            std::cout << "Thread " << id << " finished" << std::endl;
+        }
+        
+        int main() {
+            std::cout << "=== Library-style threading test ===" << std::endl;
+            
+            // Single thread test (like library usage)
+            std::thread t1(thread_func, 1);
+            t1.join();
+            
+            std::cout << "Single thread test passed" << std::endl;
+            return 0;
+        }
+        EOF
+        
+        cat > minimal_test/simple_test.cpp << 'EOF'
+        #include <iostream>
+        #include <thread>
+        #include <vector>
+        
+        void thread_func(int id) {
+            std::cout << "Thread " << id << " started" << std::endl;
+            std::this_thread::sleep_for(std::chrono::milliseconds(50));
+            std::cout << "Thread " << id << " finished" << std::endl;
+        }
+        
+        int main() {
+            std::cout << "=== Test-style threading test ===" << std::endl;
+            
+            // Multiple threads test (like test usage)
+            std::vector<std::thread> threads;
+            for (int i = 0; i < 5; ++i) {
+                threads.emplace_back(thread_func, i);
+            }
+            
+            for (auto& t : threads) {
+                t.join();
+            }
+            
+            std::cout << "Multiple threads test passed" << std::endl;
+            return 0;
+        }
+        EOF
+        
+        # Build with minimal CMakeLists.txt
+        mkdir minimal_build
+        cd minimal_build
+        
+        echo "Configuring minimal build..."
+        cmake -G "Ninja" -DCMAKE_BUILD_TYPE=${{ inputs.build_type }} ../minimal_test
+        
+        echo "Building minimal test..."
+        cmake --build . --verbose
+        
+        echo "Running minimal tests..."
+        ./threading_test.exe
+        ./threading_test_simple.exe
+    
+    - name: Approach 2 - Command Line Flags Only
+      if: inputs.approach == 'command-line-flags'
+      run: |
+        echo "=== APPROACH 2: Command Line Flags Only ==="
+        
+        # Create simple test files
+        mkdir -p cli_test
+        
+        cat > cli_test/main.cpp << 'EOF'
+        #include <iostream>
+        #include <thread>
+        
+        int main() {
+            std::cout << "Testing std::thread with command line flags..." << std::endl;
+            
+            std::thread t([]() {
+                std::cout << "Thread executed successfully" << std::endl;
+            });
+            
+            t.join();
+            std::cout << "Test passed!" << std::endl;
+            return 0;
+        }
+        EOF
+        
+        # Test different compiler flags
+        echo "Testing with /MT flag..."
+        cl.exe /MT cli_test/main.cpp /Fe:cli_test/test_mt.exe
+        if ($LASTEXITCODE -eq 0) {
+            echo "✓ /MT compilation successful"
+            ./cli_test/test_mt.exe
+        } else {
+            echo "✗ /MT compilation failed"
+        }
+        
+        echo "Testing with /MTd flag..."
+        cl.exe /MTd cli_test/main.cpp /Fe:cli_test/test_mtd.exe
+        if ($LASTEXITCODE -eq 0) {
+            echo "✓ /MTd compilation successful"
+            ./cli_test/test_mtd.exe
+        } else {
+            echo "✗ /MTd compilation failed"
+        }
+        
+        echo "Testing with /MD flag..."
+        cl.exe /MD cli_test/main.cpp /Fe:cli_test/test_md.exe
+        if ($LASTEXITCODE -eq 0) {
+            echo "✓ /MD compilation successful"
+            ./cli_test/test_md.exe
+        } else {
+            echo "✗ /MD compilation failed"
+        }
+        
+        echo "Testing with /MDd flag..."
+        cl.exe /MDd cli_test/main.cpp /Fe:cli_test/test_mdd.exe
+        if ($LASTEXITCODE -eq 0) {
+            echo "✓ /MDd compilation successful"
+            ./cli_test/test_mdd.exe
+        } else {
+            echo "✗ /MDd compilation failed"
+        }
+    
+    - name: Compare with Actual madronalib Build
+      run: |
+        echo "=== COMPARISON: Actual madronalib Build ==="
+        
+        cd madronalib
+        
+        # Check current CMake configuration
+        echo "Current CMakeLists.txt runtime library settings:"
+        findstr /i "MSVC_RUNTIME_LIBRARY\|_MT\|/MT\|/MD" CMakeLists.txt || echo "No runtime library settings found"
+        
+        # Try building just the library (no tests)
+        mkdir build_lib_only
+        cd build_lib_only
+        
+        echo "Building madronalib library only..."
+        cmake -G "Ninja" -DCMAKE_BUILD_TYPE=${{ inputs.build_type }} -DBUILD_TESTS=OFF ..
+        
+        echo "Library build configuration:"
+        cmake -L | findstr -i "runtime\|msvc\|thread"
+        
+        cmake --build . --target madronalib --verbose
+        
+        # Now try building with tests
+        cd ..
+        mkdir build_with_tests
+        cd build_with_tests
+        
+        echo "Building madronalib with tests..."
+        cmake -G "Ninja" -DCMAKE_BUILD_TYPE=${{ inputs.build_type }} -DBUILD_TESTS=ON ..
+        
+        echo "Test build configuration:"
+        cmake -L | findstr -i "runtime\|msvc\|thread"
+        
+        cmake --build . --target tests --verbose
+    
+    - name: Analyze Results
+      run: |
+        echo "=== ANALYSIS ==="
+        echo "Approach used: ${{ inputs.approach }}"
+        echo "Build type: ${{ inputs.build_type }}"
+        echo ""
+        echo "Check the build logs above for:"
+        echo "1. Different compiler flags between library and test targets"
+        echo "2. Runtime library settings differences"
+        echo "3. _beginthreadex errors in specific contexts"
+        echo "4. Success/failure patterns"
