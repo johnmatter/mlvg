@@ -57,6 +57,9 @@ jobs:
       run: |
         echo "=== APPROACH 1: Minimal CMakeLists.txt ==="
         
+        # Create directory first
+        mkdir -p minimal_test
+        
         # Create minimal CMakeLists.txt
         @"
         cmake_minimum_required(VERSION 3.20)
@@ -91,7 +94,6 @@ jobs:
         "@ | Out-File -FilePath minimal_test/CMakeLists.txt -Encoding UTF8
         
         # Create simple test files
-        mkdir -p minimal_test
         
         @"
         #include <iostream>
