@@ -18,15 +18,25 @@ runs:
         make -j$(nproc)
         cmake --build . --target tests --verbose
         sudo make install
+    - name: Setup MSVC environment
+      if: inputs.platform == 'windows'
+      uses: ilammy/msvc-dev-cmd@v1
+      with:
+        arch: x64
+
     - name: Build madronalib (Windows)
       if: inputs.platform == 'windows'
       shell: pwsh
       run: |
         git clone -b debug-windows-build-errors-20250821 https://github.com/johnmatter/madronalib.git
         cd madronalib
+
+        # Enable long paths for Windows
+        git config --system core.longpaths true
+
         mkdir build
         cd build
-        cmake -G "Ninja" -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON -DCMAKE_INSTALL_PREFIX="$env:USERPROFILE\madronalib" --debug-output -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_C_COMPILER="cl.exe" -DCMAKE_CXX_COMPILER="cl.exe" ..
+        cmake -G "Ninja" -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON -DCMAKE_INSTALL_PREFIX="$env:USERPROFILE\madronalib" --debug-output -DCMAKE_VERBOSE_MAKEFILE=ON ..
         cmake --build . --verbose
         cmake --build . --target tests --verbose
         cmake --install . --prefix "$env:USERPROFILE\madronalib"
