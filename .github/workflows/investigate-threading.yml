@@ -58,16 +58,17 @@ jobs:
     
     - name: Approach 1 - Minimal CMakeLists.txt
       if: inputs.approach == 'minimal-cmake'
+      shell: pwsh
       run: |
         echo "=== APPROACH 1: Minimal CMakeLists.txt ==="
         
         # Create minimal CMakeLists.txt
-        cat > minimal_test/CMakeLists.txt << 'EOF'
+        @"
         cmake_minimum_required(VERSION 3.20)
         project(ThreadingTest)
         
         # Force MSVC runtime library
-        set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+        set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded`$<`$<CONFIG:Debug>:Debug>")
         
         # Simple test executable
         add_executable(threading_test
@@ -81,23 +82,23 @@ jobs:
         
         # Set properties explicitly
         set_target_properties(threading_test PROPERTIES
-            MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>"
+            MSVC_RUNTIME_LIBRARY "MultiThreaded`$<`$<CONFIG:Debug>:Debug>"
         )
         set_target_properties(threading_test_simple PROPERTIES
-            MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>"
+            MSVC_RUNTIME_LIBRARY "MultiThreaded`$<`$<CONFIG:Debug>:Debug>"
         )
         
         # Force static runtime
         if(MSVC)
-            target_compile_options(threading_test PRIVATE /MT$<$<CONFIG:Debug>:d>)
-            target_compile_options(threading_test_simple PRIVATE /MT$<$<CONFIG:Debug>:d>)
+            target_compile_options(threading_test PRIVATE /MT`$<`$<CONFIG:Debug>:d>)
+            target_compile_options(threading_test_simple PRIVATE /MT`$<`$<CONFIG:Debug>:d>)
         endif()
-        EOF
+        "@ | Out-File -FilePath minimal_test/CMakeLists.txt -Encoding UTF8
         
         # Create simple test files
         mkdir -p minimal_test
         
-        cat > minimal_test/main.cpp << 'EOF'
+        @"
         #include <iostream>
         #include <thread>
         #include <vector>
@@ -118,9 +119,9 @@ jobs:
             std::cout << "Single thread test passed" << std::endl;
             return 0;
         }
-        EOF
+        "@ | Out-File -FilePath minimal_test/main.cpp -Encoding UTF8
         
-        cat > minimal_test/simple_test.cpp << 'EOF'
+        @"
         #include <iostream>
         #include <thread>
         #include <vector>
@@ -147,7 +148,7 @@ jobs:
             std::cout << "Multiple threads test passed" << std::endl;
             return 0;
         }
-        EOF
+        "@ | Out-File -FilePath minimal_test/simple_test.cpp -Encoding UTF8
         
         # Build with minimal CMakeLists.txt
         mkdir minimal_build
@@ -165,13 +166,14 @@ jobs:
     
     - name: Approach 2 - Command Line Flags Only
       if: inputs.approach == 'command-line-flags'
+      shell: pwsh
       run: |
         echo "=== APPROACH 2: Command Line Flags Only ==="
         
         # Create simple test files
         mkdir -p cli_test
         
-        cat > cli_test/main.cpp << 'EOF'
+        @"
         #include <iostream>
         #include <thread>
         
@@ -186,7 +188,7 @@ jobs:
             std::cout << "Test passed!" << std::endl;
             return 0;
         }
-        EOF
+        "@ | Out-File -FilePath cli_test/main.cpp -Encoding UTF8
         
         # Test different compiler flags
         echo "Testing with /MT flag..."
@@ -226,6 +228,7 @@ jobs:
         }
     
     - name: Compare with Actual madronalib Build
+      shell: pwsh
       run: |
         echo "=== COMPARISON: Actual madronalib Build ==="
         
@@ -233,7 +236,7 @@ jobs:
         
         # Check current CMake configuration
         echo "Current CMakeLists.txt runtime library settings:"
-        findstr /i "MSVC_RUNTIME_LIBRARY\|_MT\|/MT\|/MD" CMakeLists.txt || echo "No runtime library settings found"
+        Select-String -Pattern "MSVC_RUNTIME_LIBRARY|_MT|/MT|/MD" -Path CMakeLists.txt -CaseSensitive:$false || echo "No runtime library settings found"
         
         # Try building just the library (no tests)
         mkdir build_lib_only
