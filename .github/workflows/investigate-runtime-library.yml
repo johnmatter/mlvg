@@ -1,0 +1,228 @@
+name: Investigate Runtime Library Configuration
+
+on:
+  workflow_dispatch:
+    inputs:
+      approach:
+        description: 'Which approach to test'
+        required: true
+        default: 'ninja-generator'
+        type: choice
+        options:
+        - ninja-generator
+        - linker-control
+        - complete-isolation
+        - all-approaches
+
+jobs:
+  investigate-ninja:
+    if: github.event.inputs.approach == 'ninja-generator' || github.event.inputs.approach == 'all-approaches'
+    runs-on: windows-latest
+    name: Approach 1 - Ninja Generator
+    steps:
+    - name: Checkout mlvg
+      uses: actions/checkout@v4
+      with:
+        ref: windows-threading
+
+    - name: Checkout madronalib
+      uses: actions/checkout@v4
+      with:
+        repository: johnmatter/madronalib
+        ref: header-cleanup
+        path: madronalib
+
+    - name: Setup MSVC
+      uses: ilammy/msvc-dev-cmd@v1
+
+    - name: Install Ninja
+      run: |
+        echo "Installing Ninja build system..."
+        choco install ninja -y
+
+    - name: Test Ninja Generator Approach
+      run: |
+        echo "=== Testing Ninja Generator Approach ==="
+        echo "This approach uses Ninja generator instead of Visual Studio generator"
+        echo "Ninja is less aggressive about forcing /MD runtime library"
+        
+        cd madronalib
+        mkdir build-ninja
+        cd build-ninja
+        
+        echo "=== Configuring with Ninja Generator ==="
+        cmake -G "Ninja" -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON -DCMAKE_INSTALL_PREFIX="$env:USERPROFILE\madronalib" ..
+        
+        echo "=== Checking Runtime Library Configuration ==="
+        cmake -L | Select-String -Pattern "runtime|RUNTIME" -CaseSensitive:$false || echo "No runtime library settings found"
+        
+        echo "=== Building with Ninja ==="
+        cmake --build . --config Release --verbose
+        
+        if ($LASTEXITCODE -eq 0) {
+          echo "✓ Ninja generator approach SUCCESSFUL"
+          echo "=== Running Tests ==="
+          ctest --output-on-failure
+        } else {
+          echo "✗ Ninja generator approach FAILED"
+          exit 1
+        }
+
+  investigate-linker:
+    if: github.event.inputs.approach == 'linker-control' || github.event.inputs.approach == 'all-approaches'
+    runs-on: windows-latest
+    name: Approach 2 - Linker-Level Control
+    steps:
+    - name: Checkout mlvg
+      uses: actions/checkout@v4
+      with:
+        ref: windows-threading
+
+    - name: Checkout madronalib
+      uses: actions/checkout@v4
+      with:
+        repository: johnmatter/madronalib
+        ref: header-cleanup
+        path: madronalib
+
+    - name: Setup MSVC
+      uses: ilammy/msvc-dev-cmd@v1
+
+    - name: Apply Linker-Level Runtime Control
+      run: |
+        echo "=== Applying Linker-Level Runtime Control ==="
+        cd madronalib
+        
+        # Create a backup of the original CMakeLists.txt
+        Copy-Item CMakeLists.txt CMakeLists.txt.backup
+        
+        # Create a simple CMakeLists.txt modification
+        $content = Get-Content CMakeLists.txt -Raw
+        $insertion = "`n# Force static runtime libraries at linker level`nif(MSVC)`n    set(CMAKE_EXE_LINKER_FLAGS_RELEASE `${CMAKE_EXE_LINKER_FLAGS_RELEASE} /NODEFAULTLIB:msvcrt.lib)`n    set(CMAKE_EXE_LINKER_FLAGS_DEBUG `${CMAKE_EXE_LINKER_FLAGS_DEBUG} /NODEFAULTLIB:msvcrtd.lib)`n    set(CMAKE_SHARED_LINKER_FLAGS_RELEASE `${CMAKE_SHARED_LINKER_FLAGS_RELEASE} /NODEFAULTLIB:msvcrt.lib)`n    set(CMAKE_SHARED_LINKER_FLAGS_DEBUG `${CMAKE_SHARED_LINKER_FLAGS_DEBUG} /NODEFAULTLIB:msvcrtd.lib)`n    set(CMAKE_MSVC_RUNTIME_LIBRARY MultiThreaded`$<`$<CONFIG:Debug>:Debug>)`nendif()`n"
+        
+        # Insert after cmake_minimum_required
+        $content = $content -replace "(cmake_minimum_required\(VERSION [^)]+\))", "`$1$insertion"
+        $content | Out-File -FilePath CMakeLists.txt -Encoding UTF8
+        
+        echo "=== Modified CMakeLists.txt with linker control ==="
+        Select-String -Pattern "NODEFAULTLIB|MSVC_RUNTIME_LIBRARY" -Path CMakeLists.txt -CaseSensitive:$false
+
+    - name: Test Linker Control Approach
+      run: |
+        echo "=== Testing Linker-Level Control Approach ==="
+        echo "This approach forces static runtime at the linker level"
+        echo "by excluding dynamic runtime libraries from linking"
+        
+        cd madronalib
+        mkdir build-linker
+        cd build-linker
+        
+        echo "=== Configuring with Linker Control ==="
+        cmake -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON -DCMAKE_INSTALL_PREFIX="$env:USERPROFILE\madronalib" ..
+        
+        echo "=== Checking Runtime Library Configuration ==="
+        cmake -L | Select-String -Pattern "runtime|RUNTIME" -CaseSensitive:$false || echo "No runtime library settings found"
+        
+        echo "=== Building with Linker Control ==="
+        cmake --build . --config Release --verbose
+        
+        if ($LASTEXITCODE -eq 0) {
+          echo "✓ Linker control approach SUCCESSFUL"
+          echo "=== Running Tests ==="
+          ctest --output-on-failure
+        } else {
+          echo "✗ Linker control approach FAILED"
+          exit 1
+        }
+
+  investigate-complete-isolation:
+    if: github.event.inputs.approach == 'complete-isolation' || github.event.inputs.approach == 'all-approaches'
+    runs-on: windows-latest
+    name: Approach 3 - Complete Runtime Library Isolation
+    steps:
+    - name: Checkout mlvg
+      uses: actions/checkout@v4
+      with:
+        ref: windows-threading
+
+    - name: Checkout madronalib
+      uses: actions/checkout@v4
+      with:
+        repository: johnmatter/madronalib
+        ref: header-cleanup
+        path: madronalib
+
+    - name: Setup MSVC
+      uses: ilammy/msvc-dev-cmd@v1
+
+    - name: Apply Complete Runtime Library Isolation
+      run: |
+        echo "=== Applying Complete Runtime Library Isolation ==="
+        cd madronalib
+        
+        # Create a backup of the original CMakeLists.txt
+        Copy-Item CMakeLists.txt CMakeLists.txt.backup
+        
+        # Create a simple CMakeLists.txt modification
+        $content = Get-Content CMakeLists.txt -Raw
+        $insertion = "`n# Complete Runtime Library Isolation`nif(MSVC)`n    string(REPLACE /MD "" CMAKE_CXX_FLAGS `${CMAKE_CXX_FLAGS})`n    string(REPLACE /MT "" CMAKE_CXX_FLAGS `${CMAKE_CXX_FLAGS})`n    string(REPLACE /MDd "" CMAKE_CXX_FLAGS `${CMAKE_CXX_FLAGS})`n    string(REPLACE /MTd "" CMAKE_CXX_FLAGS `${CMAKE_CXX_FLAGS})`n    set(CMAKE_CXX_FLAGS `${CMAKE_CXX_FLAGS} /MT`$<`$<CONFIG:Debug>:d>)`n    set(CMAKE_C_FLAGS `${CMAKE_C_FLAGS} /MT`$<`$<CONFIG:Debug>:d>)`n    set(CMAKE_EXE_LINKER_FLAGS `${CMAKE_EXE_LINKER_FLAGS} /NODEFAULTLIB:msvcrt.lib)`n    set(CMAKE_SHARED_LINKER_FLAGS `${CMAKE_SHARED_LINKER_FLAGS} /NODEFAULTLIB:msvcrt.lib)`n    set(CMAKE_MSVC_RUNTIME_LIBRARY MultiThreaded`$<`$<CONFIG:Debug>:Debug>)`n    echo(STATUS Applied complete runtime library isolation)`nendif()`n"
+        
+        # Insert after cmake_minimum_required
+        $content = $content -replace "(cmake_minimum_required\(VERSION [^)]+\))", "`$1$insertion"
+        $content | Out-File -FilePath CMakeLists.txt -Encoding UTF8
+        
+        echo "=== Modified CMakeLists.txt with complete isolation ==="
+        Select-String -Pattern "NODEFAULTLIB|MSVC_RUNTIME_LIBRARY|/MT" -Path CMakeLists.txt -CaseSensitive:$false
+
+    - name: Test Complete Isolation Approach
+      run: |
+        echo "=== Testing Complete Runtime Library Isolation ==="
+        echo "This approach removes all runtime library flags and forces static runtime"
+        echo "at both compiler and linker levels"
+        
+        cd madronalib
+        mkdir build-isolation
+        cd build-isolation
+        
+        echo "=== Configuring with Complete Isolation ==="
+        cmake -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON -DCMAKE_INSTALL_PREFIX="$env:USERPROFILE\madronalib" ..
+        
+        echo "=== Checking Runtime Library Configuration ==="
+        cmake -L | Select-String -Pattern "runtime|RUNTIME" -CaseSensitive:$false || echo "No runtime library settings found"
+        
+        echo "=== Building with Complete Isolation ==="
+        cmake --build . --config Release --verbose
+        
+        if ($LASTEXITCODE -eq 0) {
+          echo "✓ Complete isolation approach SUCCESSFUL"
+          echo "=== Running Tests ==="
+          ctest --output-on-failure
+        } else {
+          echo "✗ Complete isolation approach FAILED"
+          exit 1
+        }
+
+  summary:
+    if: github.event.inputs.approach == 'all-approaches'
+    runs-on: ubuntu-latest
+    needs: [investigate-ninja, investigate-linker, investigate-complete-isolation]
+    name: Summary of All Approaches
+    steps:
+    - name: Checkout mlvg
+      uses: actions/checkout@v4
+      with:
+        ref: windows-threading
+
+    - name: Generate Summary Report
+      run: |
+        echo "=== Runtime Library Investigation Summary ==="
+        echo ""
+        echo "Three approaches were tested:"
+        echo "1. Ninja Generator - Less aggressive about /MD"
+        echo "2. Linker-Level Control - Force static runtime at linker level"
+        echo "3. Complete Isolation - Remove all flags and force static runtime"
+        echo ""
+        echo "Check the individual job results above for detailed outcomes."
+        echo ""
+        echo "If any approach succeeded, we can implement it in the main build."
+        echo "If all failed, we may need to consider the std::thread replacement approach."
