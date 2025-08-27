@@ -1,5 +1,8 @@
 
 
+// Include platform header for Windows threading setup before <thread>
+#include "MLPlatform.h"
+
 #include <chrono>
 #include <cstring>
 #include <iostream>
