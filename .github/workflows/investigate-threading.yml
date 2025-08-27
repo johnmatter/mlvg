@@ -36,7 +36,7 @@ jobs:
       uses: actions/checkout@v4
       with:
         repository: johnmatter/madronalib
-        ref: main
+        ref: master
         path: madronalib
     
     - name: Setup MSVC
