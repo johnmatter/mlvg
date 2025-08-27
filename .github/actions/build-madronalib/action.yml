@@ -26,7 +26,7 @@ runs:
         cd madronalib
         mkdir build
         cd build
-        cmake -G "Ninja" -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON -DCMAKE_INSTALL_PREFIX="$env:USERPROFILE\madronalib" --debug-output -DCMAKE_VERBOSE_MAKEFILE=ON ..
+        cmake -G "Ninja" -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON -DCMAKE_INSTALL_PREFIX="$env:USERPROFILE\madronalib" --debug-output -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_C_COMPILER="cl.exe" -DCMAKE_CXX_COMPILER="cl.exe" ..
         cmake --build . --verbose
         cmake --build . --target tests --verbose
         cmake --install . --prefix "$env:USERPROFILE\madronalib"
