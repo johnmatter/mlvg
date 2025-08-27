@@ -11,7 +11,7 @@ runs:
       if: inputs.platform == 'linux'
       shell: bash
       run: |
-        git clone -b debug-linux-build-errors-20250822 https://github.com/johnmatter/madronalib.git
+        git clone -b threading-replacement https://github.com/johnmatter/madronalib.git
         cd madronalib
         mkdir build && cd build
         cmake -DCMAKE_BUILD_TYPE=Release -DLINUX_ASOUND=ON -DBUILD_TESTS=ON ..
@@ -27,7 +27,7 @@ runs:
       if: inputs.platform == 'windows'
       shell: pwsh
       run: |
-        git clone -b debug-windows-build-errors-20250821 https://github.com/johnmatter/madronalib.git
+        git clone -b threading-replacement https://github.com/johnmatter/madronalib.git
         cd madronalib
 
         # Enable long paths for Windows
@@ -43,7 +43,7 @@ runs:
       if: inputs.platform == 'macos'
       shell: bash
       run: |
-        git clone -b debug-windows-build-errors-20250821 https://github.com/johnmatter/madronalib.git
+        git clone -b threading-replacement https://github.com/johnmatter/madronalib.git
         cd madronalib
         mkdir build && cd build
         cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON ..
