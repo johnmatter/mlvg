@@ -29,7 +29,7 @@ runs:
         cmake -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON ..
         cmake --build . --config Release
         cmake --build . --config Release --target tests --verbose
-        cmake --install . --prefix C:\madronalib
+        cmake --install . --prefix "%USERPROFILE%\madronalib"
     - name: Build madronalib (macOS)
       if: inputs.platform == 'macos'
       shell: bash
