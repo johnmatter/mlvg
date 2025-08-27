@@ -7,38 +7,47 @@ inputs:
 runs:
   using: 'composite'
   steps:
+    # Test mlvg on Linux - checks both bin/ and root locations for test executable
     - name: Test mlvg (Linux)
       if: inputs.platform == 'linux'
       shell: bash
       run: |
-        echo "Current directory: $(pwd)"
-        echo "Contents of current directory:"
-        ls -la
-        echo "Contents of build directory:"
-        ls -la build/
         cd build
-        ./tests
+        if [ -f "./bin/tests" ]; then
+          ./bin/tests
+        elif [ -f "./tests" ]; then
+          ./tests
+        else
+          echo "Error: Test executable not found in build/"
+          exit 1
+        fi
     
+    # Test mlvg on Windows - checks both Release/ and bin/ locations for test executable
     - name: Test mlvg (Windows)
       if: inputs.platform == 'windows'
       shell: pwsh
       run: |
-        Write-Host "Current directory: $(Get-Location)"
-        Write-Host "Contents of current directory:"
-        Get-ChildItem
-        Write-Host "Contents of build directory:"
-        Get-ChildItem build/
         cd build
-        ./Release/tests.exe
+        if (Test-Path "./Release/tests.exe") {
+          ./Release/tests.exe
+        } elseif (Test-Path "./bin/tests.exe") {
+          ./bin/tests.exe
+        } else {
+          Write-Error "Error: Test executable not found in build/"
+          exit 1
+        }
     
+    # Test mlvg on macOS - checks both bin/ and root locations for test executable
     - name: Test mlvg (macOS)
       if: inputs.platform == 'macos'
       shell: bash
       run: |
-        echo "Current directory: $(pwd)"
-        echo "Contents of current directory:"
-        ls -la
-        echo "Contents of build directory:"
-        ls -la build/
         cd build
-        ./tests
+        if [ -f "./bin/tests" ]; then
+          ./bin/tests
+        elif [ -f "./tests" ]; then
+          ./tests
+        else
+          echo "Error: Test executable not found in build/"
+          exit 1
+        fi
