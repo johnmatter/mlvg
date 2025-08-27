@@ -15,17 +15,39 @@
 #--------------------------------------------------------------------
 # set min version and deployment target -- before project
 #--------------------------------------------------------------------
-    
- cmake_minimum_required(VERSION 3.10)
-    
+
+cmake_minimum_required(VERSION 3.10)
+
 cmake_policy(SET CMP0177 NEW)
-    set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/")
-    list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
- 
-  IF(APPLE)
-   SET(CMAKE_OSX_ARCHITECTURES "x86_64;arm64" CACHE STRING "Build architectures for Mac OS X" FORCE)
-   SET(CMAKE_OSX_DEPLOYMENT_TARGET "10.14" CACHE STRING "Minimum OS X deployment version")
-  ENDIF(APPLE)
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/")
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
+
+# MSVC Runtime Library Setting - MUST be before project()
+if(MSVC)
+    # arcane thing about setting runtime library flags
+    cmake_policy(SET CMP0091 NEW)
+
+    # Use the same CMAKE_MSVC_RUNTIME_LIBRARY approach as madronalib for consistency
+    # This ensures both projects use the same static multithreaded runtime library
+    # to avoid linker conflicts when mlvg links against madronalib.
+    #
+    # Build Type      | Runtime Library Value | Compiler Flag | Description
+    # ----------------|-----------------------|---------------|-------------
+    # Debug           | MultiThreadedDebug    | /MTd          | Static debug multithreaded
+    # Release         | MultiThreaded         | /MT           | Static release multithreaded
+    # RelWithDebInfo  | MultiThreaded         | /MT           | Static release multithreaded (with debug info)
+    # MinSizeRel      | MultiThreaded         | /MT           | Static release multithreaded (size-optimized)
+    #
+    # This matches the setting in madronalib
+    #
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+    message(STATUS "mlvg: Set CMAKE_MSVC_RUNTIME_LIBRARY to ${CMAKE_MSVC_RUNTIME_LIBRARY}")
+endif()
+
+IF(APPLE)
+ SET(CMAKE_OSX_ARCHITECTURES "x86_64;arm64" CACHE STRING "Build architectures for Mac OS X" FORCE)
+ SET(CMAKE_OSX_DEPLOYMENT_TARGET "10.14" CACHE STRING "Minimum OS X deployment version")
+ENDIF(APPLE)
 
 
 #--------------------------------------------------------------------
@@ -67,25 +89,7 @@ option(BUILD_CLAP_EXAMPLE "Build CLAP plugin example" OFF)
    add_compile_definitions(_CRT_SECURE_NO_WARNINGS)
  endif()
 
-if(MSVC)
-    # arcane thing about setting runtime library flags
-    cmake_policy(SET CMP0091 NEW)
-
-    # Use the same CMAKE_MSVC_RUNTIME_LIBRARY approach as madronalib for consistency
-    # This ensures both projects use the same static multithreaded runtime library
-    # to avoid linker conflicts when mlvg links against madronalib.
-    #
-    # Build Type      | Runtime Library Value | Compiler Flag | Description
-    # ----------------|-----------------------|---------------|-------------
-    # Debug           | MultiThreadedDebug    | /MTd          | Static debug multithreaded
-    # Release         | MultiThreaded         | /MT           | Static release multithreaded
-    # RelWithDebInfo  | MultiThreaded         | /MT           | Static release multithreaded (with debug info)
-    # MinSizeRel      | MultiThreaded         | /MT           | Static release multithreaded (size-optimized)
-    #
-    # This matches the setting in madronalib
-    #
-    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
-endif()
+# Runtime library settings moved to before project() command above
 
  #--------------------------------------------------------------------
  # Choose library output name
