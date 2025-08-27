@@ -236,10 +236,11 @@ message("madronalib library should be in: " ${MADRONALIB_LIBRARY_DIR}/${madronal
       ${MLVG_SOURCE_DIR}/external/osdialog/osdialog_mac.m
    )
  elseif(UNIX AND NOT APPLE)
+   # Use zenity-based dialog for Linux (no GTK dependency)
    set(osdialog_sources_native
-       ${MLVG_SOURCE_DIR}/external/osdialog/osdialog_gtk3.c
+       ${MLVG_SOURCE_DIR}/external/osdialog/osdialog_zenity.c
    )
- endif()
+endif()
  
  list(APPEND osdialog_sources ${osdialog_sources_native} )
  
