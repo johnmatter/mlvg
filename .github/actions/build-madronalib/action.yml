@@ -26,9 +26,14 @@ runs:
         cd madronalib
         mkdir build
         cd build
-        cmake -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON -DCMAKE_INSTALL_PREFIX="$env:USERPROFILE\madronalib" ..
-        cmake --build . --config Release
-        cmake --build . --config Release --target tests --verbose
+        echo "=== CMake Configuration Phase ==="
+        cmake -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON -DCMAKE_INSTALL_PREFIX="$env:USERPROFILE\madronalib" --debug-output -DCMAKE_VERBOSE_MAKEFILE=ON ..
+        echo "=== Checking CMAKE_MSVC_RUNTIME_LIBRARY setting ==="
+        cmake -L | grep -i runtime || echo "No runtime library setting found"
+        echo "=== Main Build Phase ==="
+        cmake --build . --config Release --verbose -- /verbosity:diagnostic
+        echo "=== Tests Build Phase ==="
+        cmake --build . --config Release --target tests --verbose -- /verbosity:diagnostic
         cmake --install . --prefix "$env:USERPROFILE\madronalib"
     - name: Build madronalib (macOS)
       if: inputs.platform == 'macos'
