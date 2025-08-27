@@ -17,13 +17,16 @@ runs:
         cmake --build . --target tests --verbose
     - name: Build mlvg (Windows)
       if: inputs.platform == 'windows'
+      uses: ilammy/msvc-dev-cmd@v1
+      with:
+        arch: x64
       shell: pwsh
       run: |
         mkdir build
         cd build
-        cmake -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release -DBUILD_CLAP_EXAMPLE=ON -DBUILD_SDL2_APP=OFF -DBUILD_TESTS=ON -DSDL2_INCLUDE_DIRS="../SDL/include" -DSDL2_LIBRARIES_DIR="../SDL/lib/x64" ..
-        cmake --build . --config Release
-        cmake --build . --config Release --target tests --verbose
+        cmake -G "Ninja" -DCMAKE_BUILD_TYPE=Release -DBUILD_CLAP_EXAMPLE=ON -DBUILD_SDL2_APP=OFF -DBUILD_TESTS=ON -DSDL2_INCLUDE_DIRS="../SDL/include" -DSDL2_LIBRARIES_DIR="../SDL/lib/x64" ..
+        cmake --build . --verbose
+        cmake --build . --target tests --verbose
     - name: Build mlvg (macOS)
       if: inputs.platform == 'macos'
       shell: bash

@@ -18,14 +18,11 @@ runs:
         make -j$(nproc)
         cmake --build . --target tests --verbose
         sudo make install
-    - name: Setup MSVC environment
+    - name: Build madronalib (Windows)
       if: inputs.platform == 'windows'
       uses: ilammy/msvc-dev-cmd@v1
       with:
         arch: x64
-
-    - name: Build madronalib (Windows)
-      if: inputs.platform == 'windows'
       shell: pwsh
       run: |
         git clone -b debug-windows-build-errors-20250821 https://github.com/johnmatter/madronalib.git
