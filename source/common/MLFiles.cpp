@@ -39,6 +39,8 @@ ml::Path fsToMLPath(const fs::path& p)
     char separator{ '/' };
 #elif ML_WINDOWS
     char separator{ '\\' };
+#elif defined(__linux__)
+    char separator{ '/' };
 #endif
     std::string pathStr(p.string());
     TextFragment filePathAsText(pathStr.c_str());
@@ -52,6 +54,8 @@ fs::path mlToFSPath(const ml::Path& p)
   TextFragment pathTxt = rootPathToText(p);
 #elif ML_WINDOWS
   TextFragment pathTxt = pathToText(p);
+#elif defined(__linux__)
+  TextFragment pathTxt = rootPathToText(p);
 #endif
   
   return fs::path(pathTxt.getText());

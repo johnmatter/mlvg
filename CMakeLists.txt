@@ -204,6 +204,19 @@ message("madronalib library should be in: " ${MADRONALIB_LIBRARY_DIR}/${madronal
           set_source_files_properties(source/external/glad/glad.c
           PROPERTIES COMPILE_FLAGS /wd4055)
       endif()
+  else()
+      # Linux and other Unix systems
+      set(NANOVG_SOURCES
+          ${MLVG_SOURCE_DIR}/external/nanovg/src/nanovg.c
+          ${MLVG_SOURCE_DIR}/external/nanovg/src/nanovg.h
+          ${MLVG_SOURCE_DIR}/external/nanosvg/src/nanosvg.h
+          ${MLVG_SOURCE_DIR}/external/nanovg/src/nanovg_gl.h
+          ${MLVG_SOURCE_DIR}/external/nanovg/src/nanovg_gl_utils.h
+      )
+      set(NANOVG_INCLUDE_DIRS
+          ${MLVG_SOURCE_DIR}/external/nanovg/src
+          ${MLVG_SOURCE_DIR}/external/nanosvg/src
+      )
   endif()
  
  #--------------------------------------------------------------------
