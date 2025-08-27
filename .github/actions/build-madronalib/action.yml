@@ -11,7 +11,7 @@ runs:
       if: inputs.platform == 'linux'
       shell: bash
       run: |
-        git clone -b github-actions-debug-20250818 https://github.com/johnmatter/madronalib.git
+        git clone -b debug-windows-build-errors-20250821 https://github.com/johnmatter/madronalib.git
         cd madronalib
         mkdir build && cd build
         cmake -DCMAKE_BUILD_TYPE=Release -DLINUX_ASOUND=ON ..
@@ -22,7 +22,7 @@ runs:
       if: inputs.platform == 'windows'
       shell: pwsh
       run: |
-        git clone -b github-actions-debug-20250818 https://github.com/johnmatter/madronalib.git
+        git clone -b debug-windows-build-errors-20250821 https://github.com/johnmatter/madronalib.git
         cd madronalib
         mkdir build
         cd build
@@ -34,7 +34,7 @@ runs:
       if: inputs.platform == 'macos'
       shell: bash
       run: |
-        git clone -b github-actions-debug-20250818 https://github.com/johnmatter/madronalib.git
+        git clone -b debug-windows-build-errors-20250821 https://github.com/johnmatter/madronalib.git
         cd madronalib
         mkdir build && cd build
         cmake -DCMAKE_BUILD_TYPE=Release ..
