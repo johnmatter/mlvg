@@ -1,0 +1,33 @@
+name: 'Build MLVG'
+description: 'Build the main mlvg project'
+inputs:
+  platform:
+    description: 'Platform to build for (linux, windows, macos)'
+    required: true
+runs:
+  using: 'composite'
+  steps:
+    - name: Build mlvg (Linux)
+      if: inputs.platform == 'linux'
+      shell: bash
+      run: |
+        mkdir build && cd build
+        cmake -DBUILD_CLAP_EXAMPLE=ON -DBUILD_SDL2_APP=OFF ..
+        make -j$(nproc)
+    
+    - name: Build mlvg (Windows)
+      if: inputs.platform == 'windows'
+      shell: pwsh
+      run: |
+        mkdir build
+        cd build
+        cmake -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release -DBUILD_CLAP_EXAMPLE=ON -DBUILD_SDL2_APP=OFF -DSDL2_INCLUDE_DIRS="../SDL/include" -DSDL2_LIBRARIES_DIR="../SDL/lib/x64" ..
+        cmake --build . --config Release
+    
+    - name: Build mlvg (macOS)
+      if: inputs.platform == 'macos'
+      shell: bash
+      run: |
+        mkdir build && cd build
+        cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_CLAP_EXAMPLE=ON -DBUILD_SDL2_APP=OFF ..
+        make -j$(sysctl -n hw.ncpu)
