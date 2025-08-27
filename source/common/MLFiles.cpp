@@ -56,6 +56,9 @@ fs::path mlToFSPath(const ml::Path& p)
   TextFragment pathTxt = pathToText(p);
 #elif defined(__linux__)
   TextFragment pathTxt = rootPathToText(p);
+#else
+  // Default case for other platforms
+  TextFragment pathTxt = rootPathToText(p);
 #endif
   
   return fs::path(pathTxt.getText());
@@ -67,6 +70,11 @@ TextFragment ml::filePathToText(const ml::Path& p)
     return rootPathToText(p);
 #elif ML_WINDOWS
     return pathToText(p, kPlatformFileSeparator);
+#elif defined(__linux__)
+    return rootPathToText(p);
+#else
+    // Default case for other platforms
+    return rootPathToText(p);
 #endif
 }
 
