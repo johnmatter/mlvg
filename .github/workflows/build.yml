@@ -12,15 +12,61 @@ on:
     - cron: '0 2 * * 0'  # Weekly on Sunday at 2 AM UTC
 
 jobs:
-  build-linux:
+  determine-platforms:
     runs-on: ubuntu-latest
-    if: ${{ contains(github.event.head_commit.message, '[ci-build]') }}
+    outputs:
+      platforms: ${{ steps.set-platforms.outputs.platforms }}
+    steps:
+      - name: Set platforms to build
+        id: set-platforms
+        run: |
+          PLATFORMS=""
+          
+          # Always build all platforms for schedule, workflow_dispatch, and release events
+          if [[ "${{ github.event_name }}" == "schedule" || "${{ github.event_name }}" == "workflow_dispatch" || "${{ github.event_name }}" == "release" ]]; then
+            PLATFORMS='["linux", "windows", "macos"]'
+          elif [[ "${{ github.event.head_commit.message }}" == *"[ci-build]"* ]]; then
+            # Build all platforms
+            PLATFORMS='["linux", "windows", "macos"]'
+          else
+            # Check for individual platform tags and build selected platforms
+            SELECTED_PLATFORMS=()
+            
+            if [[ "${{ github.event.head_commit.message }}" == *"[ci-build-ubuntu]"* ]] || [[ "${{ github.event.head_commit.message }}" == *"[ci-build-linux]"* ]]; then
+              SELECTED_PLATFORMS+=("linux")
+            fi
+            
+            if [[ "${{ github.event.head_commit.message }}" == *"[ci-build-windows]"* ]]; then
+              SELECTED_PLATFORMS+=("windows")
+            fi
+            
+            if [[ "${{ github.event.head_commit.message }}" == *"[ci-build-macos]"* ]]; then
+              SELECTED_PLATFORMS+=("macos")
+            fi
+            
+            # Convert array to JSON array
+            if [ ${#SELECTED_PLATFORMS[@]} -gt 0 ]; then
+              PLATFORMS=$(printf '"%s"' "${SELECTED_PLATFORMS[@]}" | sed 's/"/","/g' | sed 's/^/[/' | sed 's/$/]/')
+            fi
+          fi
+          
+          echo "platforms=$PLATFORMS" >> $GITHUB_OUTPUT
+          echo "Selected platforms: $PLATFORMS"
+
+  build:
+    needs: determine-platforms
+    strategy:
+      matrix:
+        platform: ${{ fromJson(needs.determine-platforms.outputs.platforms) }}
+      fail-fast: false
+    runs-on: ${{ matrix.platform == 'linux' && 'ubuntu-latest' || matrix.platform == 'windows' && 'windows-latest' || 'macos-latest' }}
     steps:
     - uses: actions/checkout@v4
       with:
         submodules: recursive
     
-    - name: Install dependencies
+    - name: Install dependencies (Linux)
+      if: matrix.platform == 'linux'
       run: |
         sudo apt-get update
         sudo apt-get install -y build-essential cmake git
@@ -28,35 +74,8 @@ jobs:
         sudo apt-get install -y libgl1-mesa-dev libglu1-mesa-dev
         sudo apt-get install -y pkg-config
     
-    - name: Build madronalib
-      run: |
-        git clone -b header-cleanup https://github.com/johnmatter/madronalib.git
-        cd madronalib
-        mkdir build && cd build
-        cmake -DCMAKE_BUILD_TYPE=Release -DLINUX_ASOUND=ON ..
-        make -j$(nproc)
-        # Skip install due to CMake install issues in madronalib
-    
-    - name: Build mlvg
-      run: |
-        mkdir build && cd build
-        cmake -DBUILD_CLAP_EXAMPLE=ON -DBUILD_SDL2_APP=OFF -DMADRONALIB_INCLUDE_DIR="../madronalib/source" -DMADRONALIB_LIBRARY_DIR="../madronalib/build" ..
-        make -j$(nproc)
-    
-    # - name: Run tests
-    #   run: |
-    #     cd build
-    #     ./tests
-
-  build-windows:
-    runs-on: windows-latest
-    if: ${{ contains(github.event.head_commit.message, '[ci-build]') }}
-    steps:
-    - uses: actions/checkout@v4
-      with:
-        submodules: recursive
-    
-    - name: Install dependencies
+    - name: Install dependencies (Windows)
+      if: matrix.platform == 'windows'
       run: |
         # Install SDL2 for Windows
         mkdir SDL
@@ -66,7 +85,23 @@ jobs:
         mv SDL2-2.28.5/* .
         cd ..
     
-    - name: Build madronalib
+    - name: Install dependencies (macOS)
+      if: matrix.platform == 'macos'
+      run: |
+        brew install sdl2 cmake
+    
+    - name: Build madronalib (Linux)
+      if: matrix.platform == 'linux'
+      run: |
+        git clone -b header-cleanup https://github.com/johnmatter/madronalib.git
+        cd madronalib
+        mkdir build && cd build
+        cmake -DCMAKE_BUILD_TYPE=Release -DLINUX_ASOUND=ON ..
+        make -j$(nproc)
+        sudo make install
+    
+    - name: Build madronalib (Windows)
+      if: matrix.platform == 'windows'
       run: |
         git clone -b header-cleanup https://github.com/johnmatter/madronalib.git
         cd madronalib
@@ -74,33 +109,10 @@ jobs:
         cd build
         cmake -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release -DWIN32_MM=ON ..
         cmake --build . --config Release
-        # Skip install due to compilation issues in madronalib
+        cmake --install . --prefix "C:/Program Files/madronalib"
     
-    - name: Build mlvg
-      run: |
-        mkdir build
-        cd build
-        cmake -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release -DBUILD_CLAP_EXAMPLE=ON -DBUILD_SDL2_APP=OFF -DSDL2_INCLUDE_DIRS="../SDL/include" -DSDL2_LIBRARIES_DIR="../SDL/lib/x64" -DMADRONALIB_INCLUDE_DIR="../madronalib/source" -DMADRONALIB_LIBRARY_DIR="../madronalib/build/Release" ..
-        cmake --build . --config Release
-    
-    # - name: Run tests
-    #   run: |
-    #     cd build/Release
-    #     ./tests.exe
-
-  build-macos:
-    runs-on: macos-latest
-    if: ${{ contains(github.event.head_commit.message, '[ci-build]') }}
-    steps:
-    - uses: actions/checkout@v4
-      with:
-        submodules: recursive
-    
-    - name: Install dependencies
-      run: |
-        brew install sdl2 cmake
-    
-    - name: Build madronalib
+    - name: Build madronalib (macOS)
+      if: matrix.platform == 'macos'
       run: |
         git clone -b header-cleanup https://github.com/johnmatter/madronalib.git
         cd madronalib
@@ -109,10 +121,26 @@ jobs:
         make -j$(sysctl -n hw.ncpu)
         sudo make install
     
-    - name: Build mlvg
+    - name: Build mlvg (Linux)
+      if: matrix.platform == 'linux'
       run: |
         mkdir build && cd build
-        cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_CLAP_EXAMPLE=ON -DBUILD_SDL2_APP=OFF -DMADRONALIB_INCLUDE_DIR="../madronalib/source" -DMADRONALIB_LIBRARY_DIR="../madronalib/build" ..
+        cmake -DBUILD_CLAP_EXAMPLE=ON -DBUILD_SDL2_APP=OFF ..
+        make -j$(nproc)
+    
+    - name: Build mlvg (Windows)
+      if: matrix.platform == 'windows'
+      run: |
+        mkdir build
+        cd build
+        cmake -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release -DBUILD_CLAP_EXAMPLE=ON -DBUILD_SDL2_APP=OFF -DSDL2_INCLUDE_DIRS="../SDL/include" -DSDL2_LIBRARIES_DIR="../SDL/lib/x64" ..
+        cmake --build . --config Release
+    
+    - name: Build mlvg (macOS)
+      if: matrix.platform == 'macos'
+      run: |
+        mkdir build && cd build
+        cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_CLAP_EXAMPLE=ON -DBUILD_SDL2_APP=OFF ..
         make -j$(sysctl -n hw.ncpu)
     
     # - name: Run tests
