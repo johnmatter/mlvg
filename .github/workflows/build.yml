@@ -33,14 +33,14 @@ jobs:
         git clone -b header-cleanup https://github.com/johnmatter/madronalib.git
         cd madronalib
         mkdir build && cd build
-        cmake -DCMAKE_BUILD_TYPE=Release ..
+        cmake -DCMAKE_BUILD_TYPE=Release -DLINUX_ASOUND=ON ..
         make -j$(nproc)
-        sudo make install
+        # Skip install due to CMake install issues in madronalib
     
     - name: Build mlvg
       run: |
         mkdir build && cd build
-        cmake -DBUILD_CLAP_EXAMPLE=ON -DBUILD_SDL2_APP=OFF ..
+        cmake -DBUILD_CLAP_EXAMPLE=ON -DBUILD_SDL2_APP=OFF -DMADRONALIB_INCLUDE_DIR="../madronalib/source" -DMADRONALIB_LIBRARY_DIR="../madronalib/build" ..
         make -j$(nproc)
     
     # - name: Run tests
@@ -72,15 +72,15 @@ jobs:
         cd madronalib
         mkdir build
         cd build
-        cmake -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release ..
+        cmake -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release -DWIN32_MM=ON ..
         cmake --build . --config Release
-        cmake --install . --prefix "C:/Program Files/madronalib"
+        # Skip install due to compilation issues in madronalib
     
     - name: Build mlvg
       run: |
         mkdir build
         cd build
-        cmake -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release -DBUILD_CLAP_EXAMPLE=ON -DBUILD_SDL2_APP=OFF -DSDL2_INCLUDE_DIRS="../SDL/include" -DSDL2_LIBRARIES_DIR="../SDL/lib/x64" ..
+        cmake -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release -DBUILD_CLAP_EXAMPLE=ON -DBUILD_SDL2_APP=OFF -DSDL2_INCLUDE_DIRS="../SDL/include" -DSDL2_LIBRARIES_DIR="../SDL/lib/x64" -DMADRONALIB_INCLUDE_DIR="../madronalib/source" -DMADRONALIB_LIBRARY_DIR="../madronalib/build/Release" ..
         cmake --build . --config Release
     
     # - name: Run tests
@@ -112,7 +112,7 @@ jobs:
     - name: Build mlvg
       run: |
         mkdir build && cd build
-        cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_CLAP_EXAMPLE=ON -DBUILD_SDL2_APP=OFF ..
+        cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_CLAP_EXAMPLE=ON -DBUILD_SDL2_APP=OFF -DMADRONALIB_INCLUDE_DIR="../madronalib/source" -DMADRONALIB_LIBRARY_DIR="../madronalib/build" ..
         make -j$(sysctl -n hw.ncpu)
     
     # - name: Run tests
