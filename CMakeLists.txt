@@ -354,6 +354,9 @@ if(APPLE)
     set(INCLUDES_INSTALL_DIR "include/mlvg")
 elseif(WIN32)
     set(INCLUDES_INSTALL_DIR "include")
+else()
+    # Linux and other Unix systems
+    set(INCLUDES_INSTALL_DIR "include/mlvg")
 endif()
 
 install(FILES
