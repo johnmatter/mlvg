@@ -92,7 +92,7 @@ if(APPLE)
     set (MADRONALIB_INCLUDE_DIR "${CMAKE_INSTALL_FULL_INCLUDEDIR}/madronalib")
     set (MADRONALIB_LIBRARY_DIR ${CMAKE_INSTALL_FULL_LIBDIR})
 elseif(WIN32)
-    if(EXISTS "C:/Program Files/madronalib/lib/madrona.lib")
+    if(EXISTS "C:/Program Files/madronalib/lib/madronalib.lib")
         set (MADRONALIB_INCLUDE_DIR "C:/Program Files/madronalib/include")
         set (MADRONALIB_LIBRARY_DIR "C:/Program Files/madronalib/lib")
     else()
@@ -100,6 +100,10 @@ elseif(WIN32)
         set (MADRONALIB_LIBRARY_DIR "C:/Program Files (x86)/madronalib/lib")
     endif()
 else()
+    # Linux and other Unix systems
+    include(GNUInstallDirs)
+    set (MADRONALIB_INCLUDE_DIR "${CMAKE_INSTALL_FULL_INCLUDEDIR}/madronalib")
+    set (MADRONALIB_LIBRARY_DIR ${CMAKE_INSTALL_FULL_LIBDIR})
 endif()
 
  # add -debug suffix to link debug madronalib for debug builds
@@ -395,6 +399,9 @@ if(BUILD_TESTS)
         target_link_libraries(${target} PRIVATE "${MADRONALIB_LIBRARY_DIR}/lib${madronalib_NAME}.a")
     elseif(WIN32)
         target_link_libraries(${target} PRIVATE "${MADRONALIB_LIBRARY_DIR}/${madronalib_NAME}.lib")
+    else()
+        # Linux and other Unix systems
+        target_link_libraries(${target} PRIVATE "${MADRONALIB_LIBRARY_DIR}/lib${madronalib_NAME}.a")
     endif()
 
     # add mlvg library
@@ -484,6 +491,9 @@ if(BUILD_SDL2_APP)
         target_link_libraries(${target} PRIVATE "${MADRONALIB_LIBRARY_DIR}/lib${madronalib_NAME}.a")
     elseif(WIN32)
         target_link_libraries(${target} PRIVATE "${MADRONALIB_LIBRARY_DIR}/${madronalib_NAME}.lib")
+    else()
+        # Linux and other Unix systems
+        target_link_libraries(${target} PRIVATE "${MADRONALIB_LIBRARY_DIR}/lib${madronalib_NAME}.a")
     endif()
 
     # add mlvg library
@@ -582,6 +592,9 @@ if(BUILD_CLAP_EXAMPLE)
         target_link_libraries(${target} PRIVATE "${MADRONALIB_LIBRARY_DIR}/lib${madronalib_NAME}.a")
     elseif(WIN32)
         target_link_libraries(${target} PRIVATE "${MADRONALIB_LIBRARY_DIR}/${madronalib_NAME}.lib")
+    else()
+        # Linux and other Unix systems
+        target_link_libraries(${target} PRIVATE "${MADRONALIB_LIBRARY_DIR}/lib${madronalib_NAME}.a")
     endif()
     
     # Add include directories
