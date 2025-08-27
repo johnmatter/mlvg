@@ -20,6 +20,8 @@ runs:
       uses: ilammy/msvc-dev-cmd@v1
       with:
         arch: x64
+    - name: Build mlvg (Windows) - Run Commands
+      if: inputs.platform == 'windows'
       shell: pwsh
       run: |
         mkdir build

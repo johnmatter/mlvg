@@ -23,6 +23,8 @@ runs:
       uses: ilammy/msvc-dev-cmd@v1
       with:
         arch: x64
+    - name: Build madronalib (Windows) - Run Commands
+      if: inputs.platform == 'windows'
       shell: pwsh
       run: |
         git clone -b debug-windows-build-errors-20250821 https://github.com/johnmatter/madronalib.git
