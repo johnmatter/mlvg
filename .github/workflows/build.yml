@@ -1,6 +1,6 @@
 name: Build and Test
 
-run-name: "${{ github.event.head_commit.timestamp }} - ${{ github.event.head_commit.id }}: ${{ github.event.head_commit.message }}" 
+run-name: "${{ github.event.head_commit.timestamp }} - ${{ github.event.head_commit.id }}: ${{ github.event.head_commit.message }}"
 
 on:
   push:
@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
     inputs:
       platform:
-        description: 'Platform to build (leave empty for all platforms)'
+        description: 'Platform to build'
         required: false
         default: 'all'
         type: choice
