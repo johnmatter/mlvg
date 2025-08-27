@@ -56,7 +56,23 @@ using NativeDrawContext = NVGcontext;
 #define nvgCreateFramebuffer(ctx, w, h, flags) nvgluCreateFramebuffer(ctx, w, h, flags)
 #define nvgDeleteFramebuffer(fb) nvgluDeleteFramebuffer(fb)
 
-#elif defined LINUX // TODO
+#elif defined LINUX
+
+#define NANOVG_GL3 1
+#define NANOVG_FBO_VALID 1
+
+#include <GL/gl.h>
+#include "nanovg.h"
+#include "nanovg_gl_utils.h"
+#include "nanosvg.h"
+using NativeDrawBuffer = NVGLUframebuffer;
+using NativeDrawContext = NVGcontext;
+
+#define nvgCreateContext(flags) nvgCreateGL3(flags)
+#define nvgDeleteContext(context) nvgDeleteGL3(context)
+#define nvgBindFramebuffer(fb) nvgluBindFramebuffer(fb)
+#define nvgCreateFramebuffer(ctx, w, h, flags) nvgluCreateFramebuffer(ctx, w, h, flags)
+#define nvgDeleteFramebuffer(fb) nvgluDeleteFramebuffer(fb)
 
 #endif
 
