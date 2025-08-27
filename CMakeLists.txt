@@ -24,33 +24,25 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 
 # MSVC Runtime Library Setting - MUST be before project()
 if(MSVC)
-    # arcane thing about setting runtime library flags
+    # AGGRESSIVE: Force static runtime library to fix _beginthreadex issues
     cmake_policy(SET CMP0091 NEW)
-
-    # Use the same CMAKE_MSVC_RUNTIME_LIBRARY approach as madronalib for consistency
-    # This ensures both projects use the same static multithreaded runtime library
-    # to avoid linker conflicts when mlvg links against madronalib.
-    #
-    # Build Type      | Runtime Library Value | Compiler Flag | Description
-    # ----------------|-----------------------|---------------|-------------
-    # Debug           | MultiThreadedDebug    | /MTd          | Static debug multithreaded
-    # Release         | MultiThreaded         | /MT           | Static release multithreaded
-    # RelWithDebInfo  | MultiThreaded         | /MT           | Static release multithreaded (with debug info)
-    # MinSizeRel      | MultiThreaded         | /MT           | Static release multithreaded (size-optimized)
-    #
-    # This matches the setting in madronalib
-    #
     set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 
-    # Force static runtime library flags explicitly for Ninja generator compatibility
-    foreach(flag_var CMAKE_CXX_FLAGS CMAKE_CXX_FLAGS_DEBUG CMAKE_CXX_FLAGS_RELEASE
-                     CMAKE_C_FLAGS CMAKE_C_FLAGS_DEBUG CMAKE_C_FLAGS_RELEASE)
-        if(${flag_var} MATCHES "/MD")
-            string(REGEX REPLACE "/MD" "/MT" ${flag_var} "${${flag_var}}")
-        endif()
-    endforeach()
+    # Force /MT in all configurations - override any /MD flags
+    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /MT")
+    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /MTd")
+    set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} /MT")
+    set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} /MTd")
 
-    message(STATUS "mlvg: Set CMAKE_MSVC_RUNTIME_LIBRARY to ${CMAKE_MSVC_RUNTIME_LIBRARY}")
+    # Remove any existing /MD or /MDd flags
+    string(REPLACE "/MD" "/MT" CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE}")
+    string(REPLACE "/MDd" "/MTd" CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG}")
+    string(REPLACE "/MD" "/MT" CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE}")
+    string(REPLACE "/MDd" "/MTd" CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG}")
+
+    message(STATUS "mlvg: MSVC Runtime Library: ${CMAKE_MSVC_RUNTIME_LIBRARY}")
+    message(STATUS "mlvg: CMAKE_CXX_FLAGS_RELEASE: ${CMAKE_CXX_FLAGS_RELEASE}")
+    message(STATUS "mlvg: CMAKE_CXX_FLAGS_DEBUG: ${CMAKE_CXX_FLAGS_DEBUG}")
 endif()
 
 IF(APPLE)
