@@ -280,6 +280,11 @@ elseif(WIN32)
     ${MLVG_SOURCE_DIR}/native/MLFilesWin.cpp
     ${MLVG_SOURCE_DIR}/native/NanoVGViewWindowsGL.cpp
    )
+else()
+  # Linux and other Unix systems
+  set(MLVG_SOURCES_NATIVE
+    ${MLVG_SOURCE_DIR}/native/MLFilesLinux.cpp
+   )
 endif()
 
 #--------------------------------------------------------------------
