@@ -12,52 +12,86 @@ on:
     - cron: '0 2 * * 0'  # Weekly on Sunday at 2 AM UTC
 
 jobs:
-  determine-platforms:
+  # Check if workflow should run and determine platforms
+  check-should-run:
     runs-on: ubuntu-latest
     outputs:
-      platforms: ${{ steps.set-platforms.outputs.platforms }}
+      should-run: ${{ steps.check.outputs.should-run }}
+      platforms: ${{ steps.determine-platforms.outputs.platforms }}
     steps:
-      - name: Set platforms to build
-        id: set-platforms
+      - name: Check if workflow should run
+        id: check
         run: |
-          PLATFORMS=""
+          SHOULD_RUN="false"
+          
+          # Always run for schedule, workflow_dispatch, and release events
+          if [[ "${{ github.event_name }}" == "schedule" || "${{ github.event_name }}" == "workflow_dispatch" || "${{ github.event_name }}" == "release" ]]; then
+            SHOULD_RUN="true"
+          # Check for any CI build tags using GitHub's contains function
+          elif [[ "${{ contains(github.event.head_commit.message, '[ci-build]') }}" == "true" ]] || \
+               [[ "${{ contains(github.event.head_commit.message, '[ci-build-ubuntu]') }}" == "true" ]] || \
+               [[ "${{ contains(github.event.head_commit.message, '[ci-build-linux]') }}" == "true" ]] || \
+               [[ "${{ contains(github.event.head_commit.message, '[ci-build-windows]') }}" == "true" ]] || \
+               [[ "${{ contains(github.event.head_commit.message, '[ci-build-macos]') }}" == "true" ]]; then
+            SHOULD_RUN="true"
+          fi
+          
+          echo "should-run=$SHOULD_RUN" >> $GITHUB_OUTPUT
+          echo "Should run workflow: $SHOULD_RUN"
+      
+      - name: Determine platforms to build
+        id: determine-platforms
+        if: steps.check.outputs.should-run == 'true'
+        run: |
+          PLATFORMS='[]'  # Default to empty array to prevent fromJson errors
           
           # Always build all platforms for schedule, workflow_dispatch, and release events
           if [[ "${{ github.event_name }}" == "schedule" || "${{ github.event_name }}" == "workflow_dispatch" || "${{ github.event_name }}" == "release" ]]; then
             PLATFORMS='["linux", "windows", "macos"]'
-          elif [[ "${{ github.event.head_commit.message }}" == *"[ci-build]"* ]]; then
+          elif [[ "${{ contains(github.event.head_commit.message, '[ci-build]') }}" == "true" ]]; then
             # Build all platforms
             PLATFORMS='["linux", "windows", "macos"]'
           else
             # Check for individual platform tags and build selected platforms
             SELECTED_PLATFORMS=()
             
-            if [[ "${{ github.event.head_commit.message }}" == *"[ci-build-ubuntu]"* ]] || [[ "${{ github.event.head_commit.message }}" == *"[ci-build-linux]"* ]]; then
+            if [[ "${{ contains(github.event.head_commit.message, '[ci-build-ubuntu]') }}" == "true" ]] || \
+               [[ "${{ contains(github.event.head_commit.message, '[ci-build-linux]') }}" == "true" ]]; then
               SELECTED_PLATFORMS+=("linux")
             fi
             
-            if [[ "${{ github.event.head_commit.message }}" == *"[ci-build-windows]"* ]]; then
+            if [[ "${{ contains(github.event.head_commit.message, '[ci-build-windows]') }}" == "true" ]]; then
               SELECTED_PLATFORMS+=("windows")
             fi
             
-            if [[ "${{ github.event.head_commit.message }}" == *"[ci-build-macos]"* ]]; then
+            if [[ "${{ contains(github.event.head_commit.message, '[ci-build-macos]') }}" == "true" ]]; then
               SELECTED_PLATFORMS+=("macos")
             fi
             
-            # Convert array to JSON array
+            # Convert array to proper JSON array
             if [ ${#SELECTED_PLATFORMS[@]} -gt 0 ]; then
-              PLATFORMS=$(printf '"%s"' "${SELECTED_PLATFORMS[@]}" | sed 's/"/","/g' | sed 's/^/[/' | sed 's/$/]/')
+              JSON_ARRAY="["
+              for i in "${!SELECTED_PLATFORMS[@]}"; do
+                if [ $i -gt 0 ]; then
+                  JSON_ARRAY+=","
+                fi
+                JSON_ARRAY+="\"${SELECTED_PLATFORMS[$i]}\""
+              done
+              JSON_ARRAY+="]"
+              PLATFORMS="$JSON_ARRAY"
             fi
           fi
           
           echo "platforms=$PLATFORMS" >> $GITHUB_OUTPUT
           echo "Selected platforms: $PLATFORMS"
 
-  build:
-    needs: determine-platforms
+  # Setup dependencies for each platform
+  setup-environment:
+    needs: check-should-run
+    if: needs.check-should-run.outputs.should-run == 'true' && needs.check-should-run.outputs.platforms != '[]'
     strategy:
       matrix:
-        platform: ${{ fromJson(needs.determine-platforms.outputs.platforms) }}
+        platform: ${{ fromJson(needs.check-should-run.outputs.platforms) }}
       fail-fast: false
     runs-on: ${{ matrix.platform == 'linux' && 'ubuntu-latest' || matrix.platform == 'windows' && 'windows-latest' || 'macos-latest' }}
     steps:
@@ -65,83 +99,65 @@ jobs:
       with:
         submodules: recursive
     
-    - name: Install dependencies (Linux)
-      if: matrix.platform == 'linux'
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y build-essential cmake git
-        sudo apt-get install -y libsdl2-dev libsdl2-2.0-0
-        sudo apt-get install -y libgl1-mesa-dev libglu1-mesa-dev
-        sudo apt-get install -y pkg-config
+    - name: Setup dependencies
+      uses: ./.github/actions/setup-dependencies
+      with:
+        platform: ${{ matrix.platform }}
+
+  # Build madronalib dependency
+  build-madronalib:
+    needs: [check-should-run, setup-environment]
+    if: needs.check-should-run.outputs.should-run == 'true' && needs.check-should-run.outputs.platforms != '[]'
+    strategy:
+      matrix:
+        platform: ${{ fromJson(needs.check-should-run.outputs.platforms) }}
+      fail-fast: false
+    runs-on: ${{ matrix.platform == 'linux' && 'ubuntu-latest' || matrix.platform == 'windows' && 'windows-latest' || 'macos-latest' }}
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: recursive
     
-    - name: Install dependencies (Windows)
-      if: matrix.platform == 'windows'
-      run: |
-        # Install SDL2 for Windows
-        mkdir SDL
-        cd SDL
-        curl -L -o sdl2.zip https://github.com/libsdl-org/SDL/releases/download/release-2.28.5/SDL2-devel-2.28.5-VC.zip
-        tar -xf sdl2.zip
-        mv SDL2-2.28.5/* .
-        cd ..
+    # Re-setup environment (since jobs don't share state)
+    - name: Setup dependencies
+      uses: ./.github/actions/setup-dependencies
+      with:
+        platform: ${{ matrix.platform }}
     
-    - name: Install dependencies (macOS)
-      if: matrix.platform == 'macos'
-      run: |
-        brew install sdl2 cmake
+    - name: Build madronalib
+      uses: ./.github/actions/build-madronalib
+      with:
+        platform: ${{ matrix.platform }}
+
+  # Build mlvg
+  build-mlvg:
+    needs: [check-should-run, build-madronalib]
+    if: needs.check-should-run.outputs.should-run == 'true' && needs.check-should-run.outputs.platforms != '[]'
+    strategy:
+      matrix:
+        platform: ${{ fromJson(needs.check-should-run.outputs.platforms) }}
+      fail-fast: false
+    runs-on: ${{ matrix.platform == 'linux' && 'ubuntu-latest' || matrix.platform == 'windows' && 'windows-latest' || 'macos-latest' }}
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: recursive
     
-    - name: Build madronalib (Linux)
-      if: matrix.platform == 'linux'
-      run: |
-        git clone -b header-cleanup https://github.com/johnmatter/madronalib.git
-        cd madronalib
-        mkdir build && cd build
-        cmake -DCMAKE_BUILD_TYPE=Release -DLINUX_ASOUND=ON ..
-        make -j$(nproc)
-        sudo make install
+    # Re-setup environment and madronalib (since jobs don't share state)
+    - name: Setup dependencies
+      uses: ./.github/actions/setup-dependencies
+      with:
+        platform: ${{ matrix.platform }}
     
-    - name: Build madronalib (Windows)
-      if: matrix.platform == 'windows'
-      run: |
-        git clone -b header-cleanup https://github.com/johnmatter/madronalib.git
-        cd madronalib
-        mkdir build
-        cd build
-        cmake -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release -DWIN32_MM=ON ..
-        cmake --build . --config Release
-        cmake --install . --prefix "C:/Program Files/madronalib"
+    - name: Build madronalib
+      uses: ./.github/actions/build-madronalib
+      with:
+        platform: ${{ matrix.platform }}
     
-    - name: Build madronalib (macOS)
-      if: matrix.platform == 'macos'
-      run: |
-        git clone -b header-cleanup https://github.com/johnmatter/madronalib.git
-        cd madronalib
-        mkdir build && cd build
-        cmake -DCMAKE_BUILD_TYPE=Release ..
-        make -j$(sysctl -n hw.ncpu)
-        sudo make install
-    
-    - name: Build mlvg (Linux)
-      if: matrix.platform == 'linux'
-      run: |
-        mkdir build && cd build
-        cmake -DBUILD_CLAP_EXAMPLE=ON -DBUILD_SDL2_APP=OFF ..
-        make -j$(nproc)
-    
-    - name: Build mlvg (Windows)
-      if: matrix.platform == 'windows'
-      run: |
-        mkdir build
-        cd build
-        cmake -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release -DBUILD_CLAP_EXAMPLE=ON -DBUILD_SDL2_APP=OFF -DSDL2_INCLUDE_DIRS="../SDL/include" -DSDL2_LIBRARIES_DIR="../SDL/lib/x64" ..
-        cmake --build . --config Release
-    
-    - name: Build mlvg (macOS)
-      if: matrix.platform == 'macos'
-      run: |
-        mkdir build && cd build
-        cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_CLAP_EXAMPLE=ON -DBUILD_SDL2_APP=OFF ..
-        make -j$(sysctl -n hw.ncpu)
+    - name: Build mlvg
+      uses: ./.github/actions/build-mlvg
+      with:
+        platform: ${{ matrix.platform }}
     
     # - name: Run tests
     #   run: |

@@ -1,0 +1,35 @@
+name: 'Setup Dependencies'
+description: 'Install platform-specific dependencies for building mlvg'
+inputs:
+  platform:
+    description: 'Platform to setup (linux, windows, macos)'
+    required: true
+runs:
+  using: 'composite'
+  steps:
+    - name: Install dependencies (Linux)
+      if: inputs.platform == 'linux'
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential cmake git
+        sudo apt-get install -y libsdl2-dev libsdl2-2.0-0
+        sudo apt-get install -y libgl1-mesa-dev libglu1-mesa-dev
+        sudo apt-get install -y pkg-config
+    
+    - name: Install dependencies (Windows)
+      if: inputs.platform == 'windows'
+      shell: bash
+      run: |
+        mkdir SDL
+        cd SDL
+        curl -L -o sdl2.zip https://github.com/libsdl-org/SDL/releases/download/release-2.28.5/SDL2-devel-2.28.5-VC.zip
+        tar -xf sdl2.zip
+        mv SDL2-2.28.5/* .
+        cd ..
+    
+    - name: Install dependencies (macOS)
+      if: inputs.platform == 'macos'
+      shell: bash
+      run: |
+        brew install sdl2 cmake
