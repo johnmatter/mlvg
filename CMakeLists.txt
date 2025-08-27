@@ -580,7 +580,11 @@ if(BUILD_CLAP_EXAMPLE)
         )
         
         # Set the generated resource files to compile as C++
-        set_source_files_properties(build/resources/clap-saw-demo/resources.c PROPERTIES COMPILE_FLAGS "-x c++")
+        if(MSVC)
+            set_source_files_properties(build/resources/clap-saw-demo/resources.c PROPERTIES COMPILE_FLAGS "/Tp")
+        else()
+            set_source_files_properties(build/resources/clap-saw-demo/resources.c PROPERTIES COMPILE_FLAGS "-x c++")
+        endif()
         
         target_link_libraries(${target} PRIVATE mlvg)
         target_compile_definitions(${target} PRIVATE HAS_GUI=1)
