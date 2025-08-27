@@ -71,11 +71,20 @@ if(MSVC)
     # arcane thing about setting runtime library flags
     cmake_policy(SET CMP0091 NEW)
 
-    add_compile_options(
-        $<$<CONFIG:>:/MT>
-        $<$<CONFIG:Debug>:/MTd>
-        $<$<CONFIG:Release>:/MT>
-    )
+    # Use the same CMAKE_MSVC_RUNTIME_LIBRARY approach as madronalib for consistency
+    # This ensures both projects use the same static multithreaded runtime library
+    # to avoid linker conflicts when mlvg links against madronalib.
+    #
+    # Build Type      | Runtime Library Value | Compiler Flag | Description
+    # ----------------|-----------------------|---------------|-------------
+    # Debug           | MultiThreadedDebug    | /MTd          | Static debug multithreaded
+    # Release         | MultiThreaded         | /MT           | Static release multithreaded
+    # RelWithDebInfo  | MultiThreaded         | /MT           | Static release multithreaded (with debug info)
+    # MinSizeRel      | MultiThreaded         | /MT           | Static release multithreaded (size-optimized)
+    #
+    # This matches the setting in madronalib
+    #
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 endif()
 
  #--------------------------------------------------------------------
