@@ -41,6 +41,15 @@ if(MSVC)
     # This matches the setting in madronalib
     #
     set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+
+    # Force static runtime library flags explicitly for Ninja generator compatibility
+    foreach(flag_var CMAKE_CXX_FLAGS CMAKE_CXX_FLAGS_DEBUG CMAKE_CXX_FLAGS_RELEASE
+                     CMAKE_C_FLAGS CMAKE_C_FLAGS_DEBUG CMAKE_C_FLAGS_RELEASE)
+        if(${flag_var} MATCHES "/MD")
+            string(REGEX REPLACE "/MD" "/MT" ${flag_var} "${${flag_var}}")
+        endif()
+    endforeach()
+
     message(STATUS "mlvg: Set CMAKE_MSVC_RUNTIME_LIBRARY to ${CMAKE_MSVC_RUNTIME_LIBRARY}")
 endif()
 
