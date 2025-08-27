@@ -61,6 +61,10 @@ option(BUILD_CLAP_EXAMPLE "Build CLAP plugin example" OFF)
    # no unknown pragma warning
    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /wd4068")
    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /Zc:alignedNew-")
+   
+   # Prevent Windows min/max macros from interfering with std::min/std::max
+   add_compile_definitions(NOMINMAX)
+   add_compile_definitions(_CRT_SECURE_NO_WARNINGS)
  endif()
 
 if(MSVC)
