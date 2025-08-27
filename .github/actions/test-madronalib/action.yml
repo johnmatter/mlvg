@@ -12,7 +12,18 @@ runs:
       if: inputs.platform == 'linux'
       shell: bash
       run: |
+        echo "Current directory: $(pwd)"
+        echo "Contents of current directory:"
+        ls -la
+        echo "Checking if madronalib/build exists:"
+        ls -la madronalib/ || echo "madronalib directory not found"
+        echo "Changing to madronalib/build..."
         cd madronalib/build
+        echo "Now in directory: $(pwd)"
+        echo "Contents of build directory:"
+        ls -la
+        echo "Looking for test executable..."
+        find . -name "*tests*" -type f
         if [ -f "./bin/tests" ]; then
           ./bin/tests
         elif [ -f "./tests" ]; then
@@ -27,7 +38,22 @@ runs:
       if: inputs.platform == 'windows'
       shell: pwsh
       run: |
+        Write-Host "Current directory: $(Get-Location)"
+        Write-Host "Contents of current directory:"
+        Get-ChildItem
+        Write-Host "Checking if madronalib/build exists:"
+        if (Test-Path "madronalib") {
+          Get-ChildItem madronalib
+        } else {
+          Write-Host "madronalib directory not found"
+        }
+        Write-Host "Changing to madronalib/build..."
         cd madronalib/build
+        Write-Host "Now in directory: $(Get-Location)"
+        Write-Host "Contents of build directory:"
+        Get-ChildItem
+        Write-Host "Looking for test executable..."
+        Get-ChildItem -Recurse -Name "*tests*"
         if (Test-Path "./Release/tests.exe") {
           ./Release/tests.exe
         } elseif (Test-Path "./bin/tests.exe") {
@@ -42,7 +68,18 @@ runs:
       if: inputs.platform == 'macos'
       shell: bash
       run: |
+        echo "Current directory: $(pwd)"
+        echo "Contents of current directory:"
+        ls -la
+        echo "Checking if madronalib/build exists:"
+        ls -la madronalib/ || echo "madronalib directory not found"
+        echo "Changing to madronalib/build..."
         cd madronalib/build
+        echo "Now in directory: $(pwd)"
+        echo "Contents of build directory:"
+        ls -la
+        echo "Looking for test executable..."
+        find . -name "*tests*" -type f
         if [ -f "./bin/tests" ]; then
           ./bin/tests
         elif [ -f "./tests" ]; then

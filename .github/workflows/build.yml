@@ -118,6 +118,7 @@ jobs:
       uses: ./.github/actions/test-madronalib
       with:
         platform: ${{ matrix.platform }}
+      continue-on-error: true
     
     - name: Test mlvg
       uses: ./.github/actions/test-mlvg

@@ -26,24 +26,10 @@ runs:
         cd madronalib
         mkdir build
         cd build
-        cmake -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON ..
+        cmake -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON -DCMAKE_INSTALL_PREFIX="$env:USERPROFILE\madronalib" ..
         cmake --build . --config Release
         cmake --build . --config Release --target tests --verbose
-        echo "Installing madronalib to: $env:USERPROFILE\madronalib"
-        echo "USERPROFILE is: $env:USERPROFILE"
-        cmake --install . --prefix "$env:USERPROFILE\madronalib" --verbose
-        echo "Installation complete. Checking what was installed in user directory:"
-        if (Test-Path "$env:USERPROFILE\madronalib") {
-          Get-ChildItem "$env:USERPROFILE\madronalib" -Recurse
-        } else {
-          echo "User directory installation not found!"
-        }
-        echo "Checking what was installed in Program Files:"
-        if (Test-Path "C:\Program Files\madronalib") {
-          Get-ChildItem "C:\Program Files\madronalib" -Recurse
-        } else {
-          echo "Program Files installation not found!"
-        }
+        cmake --install . --prefix "$env:USERPROFILE\madronalib"
     - name: Build madronalib (macOS)
       if: inputs.platform == 'macos'
       shell: bash
