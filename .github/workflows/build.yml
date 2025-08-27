@@ -8,6 +8,22 @@ on:
   release:
     types: [published, prereleased]
   workflow_dispatch:
+    inputs:
+      platform:
+        description: 'Platform to build (leave empty for all platforms)'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+        - all
+        - linux
+        - windows
+        - macos
+      run_tests:
+        description: 'Run tests after building'
+        required: false
+        default: true
+        type: boolean
   schedule: # regression testing
     - cron: '0 2 * * 0'  # Weekly on Sunday at 2 AM UTC
 
@@ -18,15 +34,18 @@ jobs:
     outputs:
       should-run: ${{ steps.check.outputs.should-run }}
       platforms: ${{ steps.determine-platforms.outputs.platforms }}
+      run-tests: ${{ steps.check.outputs.run-tests }}
     steps:
       - name: Check if workflow should run
         id: check
         run: |
           SHOULD_RUN="false"
           
-          # Always run for schedule, workflow_dispatch, and release events
-          if [[ "${{ github.event_name }}" == "schedule" || "${{ github.event_name }}" == "workflow_dispatch" || "${{ github.event_name }}" == "release" ]]; then
+          # Always run for schedule, release, and manual workflow_dispatch events
+          if [[ "${{ github.event_name }}" == "schedule" || "${{ github.event_name }}" == "release" ]]; then
             SHOULD_RUN="true"
+          elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            SHOULD_RUN="true"  # Manual trigger always runs
           # Check for any CI build tags using GitHub's contains function
           elif [[ "${{ contains(github.event.head_commit.message, '[ci-build]') }}" == "true" ]] || \
                [[ "${{ contains(github.event.head_commit.message, '[ci-build-ubuntu]') }}" == "true" ]] || \
@@ -38,6 +57,21 @@ jobs:
           
           echo "should-run=$SHOULD_RUN" >> $GITHUB_OUTPUT
           echo "Should run workflow: $SHOULD_RUN"
+
+      - name: Determine if tests should run
+        id: determine-tests
+        run: |
+          RUN_TESTS="true"  # Default to running tests
+
+          # For workflow_dispatch, respect the user's choice
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            if [[ "${{ github.event.inputs.run_tests }}" == "false" ]]; then
+              RUN_TESTS="false"
+            fi
+          fi
+
+          echo "run-tests=$RUN_TESTS" >> $GITHUB_OUTPUT
+          echo "Run tests: $RUN_TESTS"
       
       - name: Determine platforms to build
         id: determine-platforms
@@ -45,9 +79,17 @@ jobs:
         run: |
           PLATFORMS='[]'  # Default to empty array to prevent fromJson errors
           
-          # Always build all platforms for schedule, workflow_dispatch, and release events
-          if [[ "${{ github.event_name }}" == "schedule" || "${{ github.event_name }}" == "workflow_dispatch" || "${{ github.event_name }}" == "release" ]]; then
-            PLATFORMS='["linux", "windows", "macos"]'
+          # Handle different event types for platform selection
+          if [[ "${{ github.event_name }}" == "schedule" || "${{ github.event_name }}" == "release" ]]; then
+            PLATFORMS='["linux", "windows", "macos"]'  # Always build all for schedule/release
+          elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            # Handle manual workflow dispatch with platform selection
+            SELECTED_PLATFORM="${{ github.event.inputs.platform }}"
+            if [[ "$SELECTED_PLATFORM" == "all" || "$SELECTED_PLATFORM" == "" ]]; then
+              PLATFORMS='["linux", "windows", "macos"]'
+            else
+              PLATFORMS="[\"$SELECTED_PLATFORM\"]"
+            fi
           elif [[ "${{ contains(github.event.head_commit.message, '[ci-build]') }}" == "true" ]]; then
             # Build all platforms
             PLATFORMS='["linux", "windows", "macos"]'
@@ -115,12 +157,14 @@ jobs:
         platform: ${{ matrix.platform }}
     
     - name: Test madronalib
+      if: needs.check-should-run.outputs.run-tests == 'true'
       uses: ./.github/actions/test-madronalib
       with:
         platform: ${{ matrix.platform }}
       continue-on-error: true
-    
+
     - name: Test mlvg
+      if: needs.check-should-run.outputs.run-tests == 'true'
       uses: ./.github/actions/test-mlvg
       with:
         platform: ${{ matrix.platform }}
