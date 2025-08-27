@@ -34,7 +34,7 @@ jobs:
     outputs:
       should-run: ${{ steps.check.outputs.should-run }}
       platforms: ${{ steps.determine-platforms.outputs.platforms }}
-      run-tests: ${{ steps.check.outputs.run-tests }}
+      run-tests: ${{ steps.determine-tests.outputs.run-tests }}
     steps:
       - name: Check if workflow should run
         id: check
