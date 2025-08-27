@@ -1,0 +1,44 @@
+name: 'Test MLVG'
+description: 'Run mlvg test suite from existing build'
+inputs:
+  platform:
+    description: 'Platform to test on (linux, windows, macos)'
+    required: true
+runs:
+  using: 'composite'
+  steps:
+    - name: Test mlvg (Linux)
+      if: inputs.platform == 'linux'
+      shell: bash
+      run: |
+        echo "Current directory: $(pwd)"
+        echo "Contents of current directory:"
+        ls -la
+        echo "Contents of build directory:"
+        ls -la build/
+        cd build
+        ./tests
+    
+    - name: Test mlvg (Windows)
+      if: inputs.platform == 'windows'
+      shell: pwsh
+      run: |
+        Write-Host "Current directory: $(Get-Location)"
+        Write-Host "Contents of current directory:"
+        Get-ChildItem
+        Write-Host "Contents of build directory:"
+        Get-ChildItem build/
+        cd build
+        ./Release/tests.exe
+    
+    - name: Test mlvg (macOS)
+      if: inputs.platform == 'macos'
+      shell: bash
+      run: |
+        echo "Current directory: $(pwd)"
+        echo "Contents of current directory:"
+        ls -la
+        echo "Contents of build directory:"
+        ls -la build/
+        cd build
+        ./tests

@@ -410,7 +410,11 @@ if(BUILD_TESTS)
     set_target_properties(${target} PROPERTIES EXCLUDE_FROM_ALL TRUE)
     add_dependencies(tests mlvg)
 
-    # add madronalib
+    # add mlvg library first (depends on madronalib)
+    target_include_directories(${target} PRIVATE ${MLVG_INCLUDE_DIRS})
+    target_link_libraries(${target} PRIVATE "mlvg")
+
+    # add madronalib (dependency of mlvg)
     target_include_directories(${target} PRIVATE ${MADRONALIB_INCLUDE_DIR})
     target_include_directories(${target} PRIVATE ${MADRONALIB_INCLUDE_DIR}/madronalib)
     if(APPLE)
@@ -421,10 +425,6 @@ if(BUILD_TESTS)
         # Linux and other Unix systems
         target_link_libraries(${target} PRIVATE "${MADRONALIB_LIBRARY_DIR}/lib${madronalib_NAME}.a")
     endif()
-
-    # add mlvg library
-    target_include_directories(${target} PRIVATE ${MLVG_INCLUDE_DIRS})
-    target_link_libraries(${target} PRIVATE "mlvg")
 
     if(APPLE)
         target_compile_definitions(${target} PUBLIC "$<$<CONFIG:DEBUG>:DEBUG>")

@@ -114,7 +114,12 @@ jobs:
       with:
         platform: ${{ matrix.platform }}
     
-    # - name: Run tests
-    #   run: |
-    #     cd build
-    #     ./tests
+    - name: Test madronalib
+      uses: ./.github/actions/test-madronalib
+      with:
+        platform: ${{ matrix.platform }}
+    
+    - name: Test mlvg
+      uses: ./.github/actions/test-mlvg
+      with:
+        platform: ${{ matrix.platform }}

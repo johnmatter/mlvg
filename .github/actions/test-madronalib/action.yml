@@ -1,0 +1,81 @@
+name: 'Test Madronalib'
+description: 'Run madronalib test suite from existing build'
+inputs:
+  platform:
+    description: 'Platform to test on (linux, windows, macos)'
+    required: true
+runs:
+  using: 'composite'
+  steps:
+    - name: Test madronalib (Linux)
+      if: inputs.platform == 'linux'
+      shell: bash
+      run: |
+        echo "Current directory: $(pwd)"
+        echo "Contents of current directory:"
+        ls -la
+        echo "Contents of madronalib directory:"
+        ls -la madronalib/
+        echo "Contents of madronalib/build directory:"
+        ls -la madronalib/build/
+        echo "Looking for test executables:"
+        find madronalib/build -name "*test*" -type f
+        echo "Contents of madronalib/build/bin directory:"
+        ls -la madronalib/build/bin/ || echo "bin directory not found"
+        cd madronalib/build
+        if [ -f "./bin/tests" ]; then
+          ./bin/tests
+        elif [ -f "./tests" ]; then
+          ./tests
+        else
+          echo "Error: tests executable not found"
+          exit 1
+        fi
+    - name: Test madronalib (Windows)
+      if: inputs.platform == 'windows'
+      shell: pwsh
+      run: |
+        Write-Host "Current directory: $(Get-Location)"
+        Write-Host "Contents of current directory:"
+        Get-ChildItem
+        Write-Host "Contents of madronalib directory:"
+        Get-ChildItem madronalib/
+        Write-Host "Contents of madronalib/build directory:"
+        Get-ChildItem madronalib/build/
+        Write-Host "Looking for test executables:"
+        Get-ChildItem madronalib/build -Recurse -Name "*test*"
+        Write-Host "Contents of madronalib/build/Release directory:"
+        Get-ChildItem madronalib/build/Release/ -ErrorAction SilentlyContinue
+        cd madronalib/build
+        if (Test-Path "./Release/tests.exe") {
+          ./Release/tests.exe
+        } elseif (Test-Path "./bin/tests.exe") {
+          ./bin/tests.exe
+        } else {
+          Write-Host "Error: tests executable not found"
+          exit 1
+        }
+    - name: Test madronalib (macOS)
+      if: inputs.platform == 'macos'
+      shell: bash
+      run: |
+        echo "Current directory: $(pwd)"
+        echo "Contents of current directory:"
+        ls -la
+        echo "Contents of madronalib directory:"
+        ls -la madronalib/
+        echo "Contents of madronalib/build directory:"
+        ls -la madronalib/build/
+        echo "Looking for test executables:"
+        find madronalib/build -name "*test*" -type f
+        echo "Contents of madronalib/build/bin directory:"
+        ls -la madronalib/build/bin/ || echo "bin directory not found"
+        cd madronalib/build
+        if [ -f "./bin/tests" ]; then
+          ./bin/tests
+        elif [ -f "./tests" ]; then
+          ./tests
+        else
+          echo "Error: tests executable not found"
+          exit 1
+        fi
