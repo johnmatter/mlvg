@@ -6,7 +6,7 @@
 #include <vector>
 
 // Include embedded font resources
-#include "../build/resources/clap-saw-demo/resources.c"
+#include "../../build/resources/clap-saw-demo/resources.c"
 
 ClapSawDemoGUI::ClapSawDemoGUI(ClapSawDemo* processor)
   : CLAPAppView("ClapSawDemo", processor) {

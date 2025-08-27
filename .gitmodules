@@ -22,3 +22,6 @@
 [submodule "examples/clap-plugin/tools/clap-info"]
 	path = examples/clap-plugin/tools/clap-info
 	url = https://github.com/free-audio/clap-info.git
+[submodule "external/clap-wrapper"]
+	path = external/clap-wrapper
+	url = https://github.com/free-audio/clap-wrapper.git

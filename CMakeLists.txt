@@ -23,7 +23,7 @@ cmake_policy(SET CMP0177 NEW)
     list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
  
   IF(APPLE)
-   SET(CMAKE_OSX_ARCHITECTURES "x86_64;arm64" CACHE STRING "Build architectures for Mac OS X" FORCE)
+   SET(CMAKE_OSX_ARCHITECTURES "arm64" CACHE STRING "Build architectures for Mac OS X" FORCE)
    SET(CMAKE_OSX_DEPLOYMENT_TARGET "10.14" CACHE STRING "Minimum OS X deployment version")
   ENDIF(APPLE)
 
@@ -44,6 +44,7 @@ set(VERSION "${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}")
 option(BUILD_SDL2_APP "Build SDL2 example app" ON)
 option(BUILD_TESTS "Build the tests" ON)
 option(BUILD_CLAP_EXAMPLE "Build CLAP plugin example" OFF)
+option(ENABLE_CLAP_WRAPPER "Enable CLAP wrapper for VST3/AUv2 export" ON)
 
  #--------------------------------------------------------------------
  # Compiler flags
@@ -529,6 +530,122 @@ if(BUILD_SDL2_APP)
         target_link_libraries(${target} PRIVATE debug "msvcrtd.lib" optimized "msvcrt.lib")
     endif()
 
+endif()
+
+#--------------------------------------------------------------------
+# CLAP wrapper support for VST3/AUv2 export
+#--------------------------------------------------------------------
+
+if(ENABLE_CLAP_WRAPPER)
+    message(STATUS "mlvg: CLAP wrapper support enabled")
+    
+    # Set macOS deployment target globally for clap-wrapper filesystem support
+    if(APPLE)
+        set(CMAKE_OSX_DEPLOYMENT_TARGET "10.15" CACHE STRING "macOS deployment target for filesystem support" FORCE)
+        message(STATUS "mlvg: Set macOS deployment target to 10.15 for clap-wrapper")
+    endif()
+    
+    # Manually configure the clap-wrapper to avoid dependency conflicts
+    set(CLAP_WRAPPER_CMAKE_CURRENT_SOURCE_DIR "${CMAKE_SOURCE_DIR}/external/clap-wrapper")
+    set(CLAP_SDK_ROOT "${CMAKE_SOURCE_DIR}/source/external/clap")
+    
+    # Set VST3 SDK path to our working build (with hosting examples disabled)
+    set(VST3_SDK_ROOT "/Users/matter/Music/madrona/vst3sdk" CACHE STRING "Path to VST3 SDK" FORCE)
+    
+    # Prevent conflicts with existing dependencies
+    set(GHC_FILESYSTEM_WITH_INSTALL OFF CACHE BOOL "Don't install filesystem" FORCE)
+    set(CLAP_WRAPPER_DOWNLOAD_DEPENDENCIES OFF CACHE BOOL "Use existing dependencies" FORCE)
+    
+    # Skip the full clap-wrapper project setup to avoid filesystem conflicts
+    # The VST3 wrapper will be included directly in the plugin CMakeLists.txt
+    # include(external/clap-wrapper/cmake/shared_prologue.cmake)  # Causes filesystem conflicts
+    # include(external/clap-wrapper/cmake/base_sdks.cmake)
+    
+    # Include wrapper cmake files as needed by the plugin
+    # (VST3 wrapper will be included directly in the plugin CMakeLists.txt)
+    # include(external/clap-wrapper/cmake/wrap_vst3.cmake)
+    # include(external/clap-wrapper/cmake/wrap_auv2.cmake)
+    
+    # Create a complete clap-wrapper-shared target with all required sources
+    add_library(clap-wrapper-shared STATIC 
+        external/clap-wrapper/src/clap_proxy.cpp
+        external/clap-wrapper/src/clap_proxy.h
+        external/clap-wrapper/src/detail/shared/sha1.cpp
+        external/clap-wrapper/src/detail/shared/sha1.h
+        external/clap-wrapper/src/detail/clap/fsutil.cpp
+        external/clap-wrapper/src/detail/clap/fsutil.h
+        external/clap-wrapper/src/detail/clap/automation.h
+    )
+    
+    # Add platform-specific sources for macOS
+    if(APPLE)
+        target_sources(clap-wrapper-shared PRIVATE
+            external/clap-wrapper/src/detail/clap/mac_helpers.mm
+        )
+    endif()
+    target_include_directories(clap-wrapper-shared PUBLIC 
+        external/clap-wrapper/src
+        external/clap-wrapper/include
+        external/clap-wrapper/libs/fmt
+        ${CMAKE_SOURCE_DIR}/source/external/filesystem/include
+        ${CMAKE_SOURCE_DIR}/source/external/clap/include
+    )
+    target_link_libraries(clap-wrapper-shared PUBLIC clap ghc_filesystem)
+    target_compile_definitions(clap-wrapper-shared PUBLIC 
+        CLAP_WRAPPER_BUILD_SHARED=1
+        CLAP_WRAPPER_VERSION="1.2.6"
+        CLAP_WRAPPER_HAS_GHCFS=1
+        RELEASE=1
+    )
+    
+    # Set macOS deployment target to support filesystem
+    if(APPLE)
+        target_compile_options(clap-wrapper-shared PRIVATE 
+            -mmacosx-version-min=10.15
+        )
+    endif()
+    
+    # Create compile options target that wrap_vst3.cmake expects
+    add_library(clap-wrapper-compile-options-public INTERFACE)
+    target_compile_definitions(clap-wrapper-compile-options-public INTERFACE
+        RELEASE=1
+        CLAP_WRAPPER_HAS_GHCFS=1
+        CLAP_WRAPPER_VERSION="1.2.6"
+    )
+    target_include_directories(clap-wrapper-compile-options-public INTERFACE
+        ${CMAKE_SOURCE_DIR}/source/external/filesystem/include
+        ${CMAKE_SOURCE_DIR}/external/clap-wrapper/libs/fmt
+    )
+    if(APPLE)
+        target_compile_options(clap-wrapper-compile-options-public INTERFACE 
+            -mmacosx-version-min=10.15
+        )
+    endif()
+    
+    # Create all the interface targets that wrap_vst3.cmake expects
+    add_library(clap-wrapper-extensions INTERFACE)
+    add_library(clap-wrapper-compile-options INTERFACE)
+    
+    # Create clap-wrapper-shared-detail as an alias to the main clap-wrapper-shared target
+    add_library(clap-wrapper-shared-detail INTERFACE)
+    target_link_libraries(clap-wrapper-shared-detail INTERFACE clap-wrapper-shared)
+    
+    target_compile_definitions(clap-wrapper-compile-options INTERFACE
+        RELEASE=1
+        CLAP_WRAPPER_HAS_GHCFS=1
+        CLAP_WRAPPER_VERSION="1.2.6"
+    )
+    target_include_directories(clap-wrapper-compile-options INTERFACE
+        ${CMAKE_SOURCE_DIR}/source/external/filesystem/include
+        ${CMAKE_SOURCE_DIR}/external/clap-wrapper/libs/fmt
+    )
+    if(APPLE)
+        target_compile_options(clap-wrapper-compile-options INTERFACE 
+            -mmacosx-version-min=10.15
+        )
+    endif()
+    
+    message(STATUS "mlvg: CLAP wrapper functions available")
 endif()
 
 #--------------------------------------------------------------------
