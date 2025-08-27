@@ -19,17 +19,18 @@ runs:
     
     - name: Install dependencies (Windows)
       if: inputs.platform == 'windows'
-      shell: bash
+      shell: pwsh
       run: |
         mkdir SDL
         cd SDL
-        curl -L -o sdl2.zip https://github.com/libsdl-org/SDL/releases/download/release-2.28.5/SDL2-devel-2.28.5-VC.zip
-        tar -xf sdl2.zip
-        mv SDL2-2.28.5/* .
+        Invoke-WebRequest -Uri "https://github.com/libsdl-org/SDL/releases/download/release-2.28.5/SDL2-devel-2.28.5-VC.zip" -OutFile "sdl2.zip"
+        Expand-Archive -Path "sdl2.zip" -DestinationPath "."
+        Move-Item -Path "SDL2-2.28.5\*" -Destination "." -Force
         cd ..
     
+    # TODO: SDL2. mlvg won't find homebrew's
     - name: Install dependencies (macOS)
       if: inputs.platform == 'macos'
       shell: bash
       run: |
-        brew install sdl2 cmake
+        brew install cmake
