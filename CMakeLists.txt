@@ -640,6 +640,9 @@ if(BUILD_CLAP_EXAMPLE)
     else()
         target_compile_definitions(${target} PRIVATE IS_WIN=1)
         set_target_properties(${target} PROPERTIES SUFFIX ".clap" PREFIX "")
+        
+        # Link Windows-specific libraries for OpenGL and DPI support
+        target_link_libraries(${target} PRIVATE opengl32 gdi32 user32 Shcore)
     endif()
     
     # Testing infrastructure
