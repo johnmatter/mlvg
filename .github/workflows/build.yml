@@ -85,65 +85,20 @@ jobs:
           echo "platforms=$PLATFORMS" >> $GITHUB_OUTPUT
           echo "Selected platforms: $PLATFORMS"
 
-  # Setup dependencies for each platform
-  setup-environment:
+  # Build complete pipeline for each platform independently
+  build:
     needs: check-should-run
     if: needs.check-should-run.outputs.should-run == 'true' && needs.check-should-run.outputs.platforms != '[]'
     strategy:
       matrix:
         platform: ${{ fromJson(needs.check-should-run.outputs.platforms) }}
-      fail-fast: false
+      fail-fast: false  # Allow other platforms to continue even if one fails
     runs-on: ${{ matrix.platform == 'linux' && 'ubuntu-latest' || matrix.platform == 'windows' && 'windows-latest' || 'macos-latest' }}
     steps:
     - uses: actions/checkout@v4
       with:
         submodules: recursive
     
-    - name: Setup dependencies
-      uses: ./.github/actions/setup-dependencies
-      with:
-        platform: ${{ matrix.platform }}
-
-  # Build madronalib dependency
-  build-madronalib:
-    needs: [check-should-run, setup-environment]
-    if: needs.check-should-run.outputs.should-run == 'true' && needs.check-should-run.outputs.platforms != '[]'
-    strategy:
-      matrix:
-        platform: ${{ fromJson(needs.check-should-run.outputs.platforms) }}
-      fail-fast: false
-    runs-on: ${{ matrix.platform == 'linux' && 'ubuntu-latest' || matrix.platform == 'windows' && 'windows-latest' || 'macos-latest' }}
-    steps:
-    - uses: actions/checkout@v4
-      with:
-        submodules: recursive
-    
-    # Re-setup environment (since jobs don't share state)
-    - name: Setup dependencies
-      uses: ./.github/actions/setup-dependencies
-      with:
-        platform: ${{ matrix.platform }}
-    
-    - name: Build madronalib
-      uses: ./.github/actions/build-madronalib
-      with:
-        platform: ${{ matrix.platform }}
-
-  # Build mlvg
-  build-mlvg:
-    needs: [check-should-run, build-madronalib]
-    if: needs.check-should-run.outputs.should-run == 'true' && needs.check-should-run.outputs.platforms != '[]'
-    strategy:
-      matrix:
-        platform: ${{ fromJson(needs.check-should-run.outputs.platforms) }}
-      fail-fast: false
-    runs-on: ${{ matrix.platform == 'linux' && 'ubuntu-latest' || matrix.platform == 'windows' && 'windows-latest' || 'macos-latest' }}
-    steps:
-    - uses: actions/checkout@v4
-      with:
-        submodules: recursive
-    
-    # Re-setup environment and madronalib (since jobs don't share state)
     - name: Setup dependencies
       uses: ./.github/actions/setup-dependencies
       with:
